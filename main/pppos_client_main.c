@@ -22,6 +22,7 @@
 #include "bg96.h"
 #include "nvs_flash.h"
 
+
 /* prender el sim sin que muera*/
 #include "driver/gpio.h"
 
@@ -35,6 +36,11 @@
 #define tamCola 1
 #define tamMSN 53
 
+//Para el gps
+
+//extern gps_data_t gps_data;
+//#define BUF_SIZE (1024)
+
 
 //#define BROKER_URL "mqtt://kike:Kike3355453@mqtt.tiosplatform.com"
 #define BROKER_URL "201.211.92.114:5500"
@@ -46,9 +52,9 @@ const int STOP_BIT = BIT1;
 const int GOT_DATA_BIT = BIT2;
 
 //Para las 3 tareas principales
- const int BEGIN_TASK1 = BIT3;
+  const int BEGIN_TASK1 = BIT3;
 
- const int BEGIN_TASK2 = BIT4;
+  const int BEGIN_TASK2 = BIT4;
 
 //static const int BEGIN_TASK3 = BIT5;
 
@@ -234,11 +240,14 @@ static void on_ip_event(void *arg, esp_event_base_t event_base,
 
 void Mandar_mensaje(void *P)
 {
+	char message[318] = "Welcome to ESP32!";
+	uint8_t vuelta = 0;
 
 	printf("Entre en mandar mensaje \r\n");
 		for(;;){
 
 		xEventGroupWaitBits(event_group,BEGIN_TASK2,true,true,portMAX_DELAY);
+
 #if CONFIG_LWIP_PPP_PAP_SUPPORT
     esp_netif_auth_type_t auth_type = NETIF_PPP_AUTHTYPE_PAP;
 #elif CONFIG_LWIP_PPP_CHAP_SUPPORT
@@ -246,22 +255,15 @@ void Mandar_mensaje(void *P)
 #else
 #error "Unsupported AUTH Negotiation"
 #endif
+
     ESP_ERROR_CHECK(esp_netif_init());
+    if (vuelta == 0){
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, NULL));
+    }
 
-    event_group = xEventGroupCreate();
 
-    /*Configurar inicio del SIM800l*/
-        /*Poner los pines como GPIO*/
-        gpio_pad_select_gpio(SIM800l_PWR_KEY);
-        gpio_pad_select_gpio(SIM800l_PWR);
-        gpio_pad_select_gpio(SIM800l_RST);
-        /*Configurar los GPIO como output, el RST como Open Drain por seguridad*/
-        gpio_set_direction(SIM800l_PWR_KEY, GPIO_MODE_OUTPUT);
-        gpio_set_direction(SIM800l_PWR, GPIO_MODE_OUTPUT);
-        gpio_set_direction(SIM800l_RST, GPIO_MODE_OUTPUT_OD);
         /* Configurar los niveles de las salidas y el pulso necesario para prender el SIM800l*/
         gpio_set_level(SIM800l_PWR, 1);
         gpio_set_level(SIM800l_RST, 1);
@@ -270,14 +272,16 @@ void Mandar_mensaje(void *P)
         gpio_set_level(SIM800l_PWR_KEY, 0);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         gpio_set_level(SIM800l_PWR_KEY, 1);
-        //hola prueba
+
 
         vTaskDelay(5000 / portTICK_PERIOD_MS);
 
     // Init netif object
+    if (vuelta == 0){
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
     esp_netif_t *esp_netif = esp_netif_new(&cfg);
     assert(esp_netif);
+    }
 
     /* create dte object */
     esp_modem_dte_config_t config = ESP_MODEM_DTE_DEFAULT_CONFIG();
@@ -310,66 +314,57 @@ void Mandar_mensaje(void *P)
     ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
     ESP_LOGI(TAG, "Battery voltage: %d mV", voltage);
     /* setup PPPoS network parameters */
-    ESP_LOGI(TAG, "Setup del PPP");
-    esp_netif_ppp_set_auth(esp_netif, auth_type, CONFIG_EXAMPLE_MODEM_PPP_AUTH_USERNAME, CONFIG_EXAMPLE_MODEM_PPP_AUTH_PASSWORD);
-    ESP_LOGI(TAG, "Despues de autentificarse");
-    void *modem_netif_adapter = esp_modem_netif_setup(dte);
-    ESP_LOGI(TAG, "Despues del void adapter, setup netif");
-    esp_modem_netif_set_default_handlers(modem_netif_adapter, esp_netif);
-    /* attach the modem to the network interface */
-    ESP_LOGI(TAG, "Conectando el modem a la interfaz");
-    esp_netif_attach(esp_netif, modem_netif_adapter);
-    /* Wait for IP address */
-    ESP_LOGI(TAG, "Esperar direccion IP");
-    xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-    /* Config MQTT */
-    esp_mqtt_client_config_t mqtt_config = {
-        .uri = BROKER_URL,
-        .event_handle = mqtt_event_handler,
-    };
-    esp_mqtt_client_handle_t mqtt_client = esp_mqtt_client_init(&mqtt_config);
-    esp_mqtt_client_start(mqtt_client);
-    xEventGroupWaitBits(event_group, GOT_DATA_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-    esp_mqtt_client_destroy(mqtt_client);
-    /* Exit PPP mode */
-    ESP_ERROR_CHECK(esp_modem_stop_ppp(dte));
-    /* Destroy the netif adapter withe events, which internally frees also the esp-netif instance */
-    esp_modem_netif_clear_default_handlers(modem_netif_adapter);
-    esp_modem_netif_teardown(modem_netif_adapter);
-    xEventGroupWaitBits(event_group, STOP_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-#if CONFIG_EXAMPLE_SEND_MSG
+
+/*#if CONFIG_EXAMPLE_SEND_MSG
     char message[318] = "Welcome to ESP32!";
     ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     ESP_LOGI(TAG, "Send send message [%s] ok", message);
-#endif
+#endif*/
+
+
 #if CONFIG_EXAMPLE_SEND_MSG
-    sprintf(message,"La humedad es: %f y la temperatura es: %f C",form1.Humedad3,form1.Temperatura3);
+    sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
     ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     ESP_LOGI(TAG, "Send send message [%s] ok", message);
 #endif
+
     /* Power down module */
     ESP_ERROR_CHECK(dce->power_down(dce));
     ESP_LOGI(TAG, "Power down");
     ESP_ERROR_CHECK(dce->deinit(dce));
     ESP_ERROR_CHECK(dte->deinit(dte));
+    ESP_LOGI(TAG, "Power down2");
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    xEventGroupClearBits(event_group, BEGIN_TASK2);
+    xEventGroupSetBits(event_group, BEGIN_TASK1);
+    vuelta = 1;
 
-	xEventGroupClearBits(event_group, BEGIN_TASK2);
-	xEventGroupSetBits(event_group, BEGIN_TASK1);
 	}
 }
 
-xQueueHandle Cola_sensor;
+//xQueueHandle Cola_sensor;
 
 void app_main(void)
 {
 	nvs_flash_init();
-	Cola_sensor = xQueueCreate(tamCola,tamMSN);
+//	Cola_sensor = xQueueCreate(tamCola,tamMSN);
 
+	 /*Configurar inicio del SIM800l*/
+	        /*Poner los pines como GPIO*/
+	        gpio_pad_select_gpio(SIM800l_PWR_KEY);
+	        gpio_pad_select_gpio(SIM800l_PWR);
+	        gpio_pad_select_gpio(SIM800l_RST);
+	        ESP_LOGI(TAG, "Hola4");
+	        /*Configurar los GPIO como output, el RST como Open Drain por seguridad*/
+	        gpio_set_direction(SIM800l_PWR_KEY, GPIO_MODE_OUTPUT);
+	        gpio_set_direction(SIM800l_PWR, GPIO_MODE_OUTPUT);
+	        gpio_set_direction(SIM800l_RST, GPIO_MODE_OUTPUT_OD);
+	        ESP_LOGI(TAG, "Hola5");
 	event_group = xEventGroupCreate();
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", Pila*3, NULL, 8, NULL,0);
 	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 6, NULL,0);
-//	xTaskCreatePinnedToCore(&Retraso3, "Retraso3", 1024, NULL, 4, NULL,0);
+//	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*6, NULL, 4, NULL,0);
 
 	 xEventGroupSetBits(event_group, BEGIN_TASK1);
 

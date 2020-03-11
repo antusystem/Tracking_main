@@ -14,7 +14,7 @@
 #define us_retardo 1
 #define numDHT_bits 40
 #define numDHT_bytes 5
-#define DHTpin 19
+#define DHTpin 18
 
 
 extern EventGroupHandle_t event_group;
@@ -231,12 +231,15 @@ void TareaDHT(void *P){
     uint8_t humedad = 0, decimal_hum = 0;
     uint16_t auxi1 = 0, auxi2 = 0, auxi3 = 0, auxi4 = 0;
     char auxc1[54] = "", auxc2[54] = "";
+    int sirve = 0;
 
     char datos_sensor[]={"-Humedad Relativa = 00.0%\n\r-Temperatura = +00.0 C\n\n\r"};
+
     for(;;){
 
     	xEventGroupWaitBits(event_group,BEGIN_TASK1,true,true,portMAX_DELAY);
 
+    	sirve = 0;
     	ESP_LOGI("PRUEBA","Esperare 3 segundos");
     	vTaskDelay(3000 / portTICK_PERIOD_MS);
         if (leerDHT(DHTpin, &humedad, &decimal_hum, &temperatura, &decimal_temp, &signo_temp) == ESP_OK){
@@ -310,14 +313,20 @@ void TareaDHT(void *P){
   //          ESP_LOGI("Sensor_AM2301","Empezare a flashear");
             set_form_flash_init(form1);
             get_form_flash(&form2);
+            sirve = 0;
 
         	//xQueueSend(Cola_sensor,&datos_sensor,0/portTICK_PERIOD_MS);
         }
         else{
             ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
+            sirve = 1;
+            xEventGroupSetBits(event_group, BEGIN_TASK1);
         }
 
-		xEventGroupClearBits(event_group, BEGIN_TASK1);
-		xEventGroupSetBits(event_group, BEGIN_TASK2);
+        if (sirve == 0){
+    		xEventGroupClearBits(event_group, BEGIN_TASK1);
+    		xEventGroupSetBits(event_group, BEGIN_TASK2);
+        }
+
     }
 }

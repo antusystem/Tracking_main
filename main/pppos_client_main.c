@@ -23,6 +23,7 @@
 #include "nvs_flash.h"
 
 
+
 /* prender el sim sin que muera*/
 #include "driver/gpio.h"
 
@@ -38,8 +39,9 @@
 
 //Para el gps
 
-//extern gps_data_t gps_data;
-//#define BUF_SIZE (1024)
+#define BUF_SIZE (1024)
+#include "NMEA_setting.h"
+
 
 
 //#define BROKER_URL "mqtt://kike:Kike3355453@mqtt.tiosplatform.com"
@@ -56,7 +58,7 @@ const int GOT_DATA_BIT = BIT2;
 
   const int BEGIN_TASK2 = BIT4;
 
-//static const int BEGIN_TASK3 = BIT5;
+  const int BEGIN_TASK3 = BIT5;
 
 #if CONFIG_EXAMPLE_SEND_MSG
 /**
@@ -241,7 +243,7 @@ static void on_ip_event(void *arg, esp_event_base_t event_base,
 void Mandar_mensaje(void *P)
 {
 	char message[318] = "Welcome to ESP32!";
-	uint8_t vuelta = 0;
+	uint8_t vuelta_men = 0;
 
 	printf("Entre en mandar mensaje \r\n");
 		for(;;){
@@ -257,11 +259,20 @@ void Mandar_mensaje(void *P)
 #endif
 
     ESP_ERROR_CHECK(esp_netif_init());
-    if (vuelta == 0){
+    if (vuelta_men == 0){
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, NULL));
     }
+
+
+
+    	ESP_LOGI(TAG, "La latitud prom es: %f", gps_data.latitude_prom);
+    	ESP_LOGI(TAG, "La latitud dir es: %s", gps_data.latitude_direct);
+        ESP_LOGI(TAG, "La longitud prom es: %f", gps_data.longitude_prom);
+      	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);
+
+
 
 
         /* Configurar los niveles de las salidas y el pulso necesario para prender el SIM800l*/
@@ -277,7 +288,7 @@ void Mandar_mensaje(void *P)
         vTaskDelay(5000 / portTICK_PERIOD_MS);
 
     // Init netif object
-    if (vuelta == 0){
+    if (vuelta_men == 0){
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
     esp_netif_t *esp_netif = esp_netif_new(&cfg);
     assert(esp_netif);
@@ -328,6 +339,18 @@ void Mandar_mensaje(void *P)
     ESP_LOGI(TAG, "Send send message [%s] ok", message);
 #endif
 
+#if CONFIG_EXAMPLE_SEND_MSG
+    sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
+    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    ESP_LOGI(TAG, "Send send message [%s] ok", message);
+#endif
+#if CONFIG_EXAMPLE_SEND_MSG
+    sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
+    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    ESP_LOGI(TAG, "Send send message [%s] ok", message);
+#endif
+
+
     /* Power down module */
     ESP_ERROR_CHECK(dce->power_down(dce));
     ESP_LOGI(TAG, "Power down");
@@ -337,7 +360,7 @@ void Mandar_mensaje(void *P)
     vTaskDelay(2000 / portTICK_PERIOD_MS);
     xEventGroupClearBits(event_group, BEGIN_TASK2);
     xEventGroupSetBits(event_group, BEGIN_TASK1);
-    vuelta = 1;
+    vuelta_men = 1;
 
 	}
 }
@@ -363,8 +386,9 @@ void app_main(void)
 	event_group = xEventGroupCreate();
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", Pila*3, NULL, 8, NULL,0);
-	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 6, NULL,0);
-//	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*6, NULL, 4, NULL,0);
+	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*6, NULL, 6, NULL,0);
+	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 4, NULL,0);
+
 
 	 xEventGroupSetBits(event_group, BEGIN_TASK1);
 

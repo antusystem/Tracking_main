@@ -25,6 +25,9 @@ extern const int BEGIN_TASK2;
 
 extern const int BEGIN_TASK3;
 
+int vuelta_temp = 0;
+
+
 
 const char *nvs_tag = "NVS";
 struct form_home *form2;
@@ -37,8 +40,10 @@ void set_form_flash_init(struct form_home form){
 	if (err != ESP_OK) {
 		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 	}else{
+		ESP_LOGI("NVS_FLASH","Humedad1 a guardar en flash: %s",form.Humedad1);
 		nvs_set_str(ctrl_flash,"Humedad1",form.Humedad1);
 
+		ESP_LOGI("NVS_FLASH","Temperatura1 a guardar en flash: %s",form.Temperatura1);
 		nvs_set_str(ctrl_flash,"Temperatura1",form.Temperatura1);
 
 		ESP_LOGI("NVS_FLASH","Temperatura2 a guardar en flash: %d",form.Temperatura2);
@@ -49,6 +54,7 @@ void set_form_flash_init(struct form_home form){
 		ESP_LOGI("NVS_FLASH","Datos_Sensor a guardar en flash: %s",form.Datos_Sensor);
 
 		nvs_set_str(ctrl_flash,"Datos_Sensor",form.Datos_Sensor);
+
 
 		err = nvs_commit(ctrl_flash);
 	}
@@ -232,101 +238,117 @@ void TareaDHT(void *P){
     uint16_t auxi1 = 0, auxi2 = 0, auxi3 = 0, auxi4 = 0;
     char auxc1[54] = "", auxc2[54] = "";
     int sirve = 0;
+    float prom_hum = 0, prom_temp = 0;
 
     char datos_sensor[]={"-Humedad Relativa = 00.0%\n\r-Temperatura = +00.0 C\n\n\r"};
 
     for(;;){
 
     	xEventGroupWaitBits(event_group,BEGIN_TASK1,true,true,portMAX_DELAY);
-
     	sirve = 0;
-    	ESP_LOGI("PRUEBA","Esperare 3 segundos");
-    	vTaskDelay(3000 / portTICK_PERIOD_MS);
-        if (leerDHT(DHTpin, &humedad, &decimal_hum, &temperatura, &decimal_temp, &signo_temp) == ESP_OK){
-        	//Determinar el signo de la temperatura
-        	if (signo_temp == 1){
-        		datos_sensor[42]= '-';
-        	}
+    	for (int j1 = 0; j1 < 17; j1++){
+        	ESP_LOGI("PRUEBA","Esperare 3 segundos");
+        	vTaskDelay(3000 / portTICK_PERIOD_MS);
+            if (leerDHT(DHTpin, &humedad, &decimal_hum, &temperatura, &decimal_temp, &signo_temp) == ESP_OK){
+            	//Determinar el signo de la temperatura
+            	if (signo_temp == 1){
+            		datos_sensor[42]= '-';
+            	}
 
-        	ESP_LOGI("Sensor_AM2301","Humedad %d.%d %% Temperatura: +%d.%dC",humedad,decimal_hum,temperatura,decimal_temp);
+            	ESP_LOGI("Sensor_AM2301","Humedad %d.%d %% Temperatura: +%d.%dC",humedad,decimal_hum,temperatura,decimal_temp);
 
-        	//Determinar la humedad diviendo la llegada de los bit mas significativos
-        	switch (humedad){
-        	case 0:
-				auxi1 = 0;
-        	break;
-        	case 1:
-				auxi1 = 256;
-        	break;
-        	case 2:
-				auxi1 = 512;
-        	break;
-        	}
+            	//Determinar la humedad diviendo la llegada de los bit mas significativos
+            	switch (humedad){
+            	case 0:
+    				auxi1 = 0;
+            	break;
+            	case 1:
+    				auxi1 = 256;
+            	break;
+            	case 2:
+    				auxi1 = 512;
+            	break;
+            	}
 
-        	//Determinar la temperatura diviendo la llegada de los bit mas significativos
-        	switch (temperatura){
-        	case 0:
-				auxi2 = 0;
-        	break;
-        	case 1:
-				auxi2 = 256;
-        	break;
-        	}
-
-
-//        	ESP_LOGI("Sensor_AM2301","%s", datos_sensor);
-        	//Guardar el valor de la humedad
-        	auxi3 = (auxi1 + decimal_hum);
-        	//Poner en un string el valor de la humedad
-//        	ESP_LOGI("Sensor_AM2301","auxi3: %d", auxi3);
-        	sprintf(auxc1,"%d",auxi3);
-//        	ESP_LOGI("Sensor_AM2301","auxc1: %s", auxc1);
-
-        	//Guardar el valor de la temperatura
-        	auxi4 = (auxi2 + decimal_temp);
- //       	ESP_LOGI("Sensor_AM2301","auxi4: %d", auxi4);
-        	//Poner en un string el valor de la temperatura
-        	sprintf(auxc2,"%d",auxi4);
- //       	ESP_LOGI("Sensor_AM2301","auxc2: %s", auxc2);
+            	//Determinar la temperatura diviendo la llegada de los bit mas significativos
+            	switch (temperatura){
+            	case 0:
+    				auxi2 = 0;
+            	break;
+            	case 1:
+    				auxi2 = 256;
+            	break;
+            	}
 
 
-        	datos_sensor[20] = auxc1[0];
-        	datos_sensor[21] = auxc1[1];
-        	datos_sensor[23] = auxc1[2];
- //       	ESP_LOGI("Sensor_AM2301","auxc1: %c", auxc1[0]);
+    //        	ESP_LOGI("Sensor_AM2301","%s", datos_sensor);
+            	//Guardar el valor de la humedad
+            	auxi3 = (auxi1 + decimal_hum);
+            	//Poner en un string el valor de la humedad
+    //        	ESP_LOGI("Sensor_AM2301","auxi3: %d", auxi3);
+            	sprintf(auxc1,"%d",auxi3);
+    //        	ESP_LOGI("Sensor_AM2301","auxc1: %s", auxc1);
 
-        	datos_sensor[43] = auxc2[0];
-            datos_sensor[44] = auxc2[1];
-        	datos_sensor[46] = auxc2[2];
-
- //       	ESP_LOGI("Sensor_AM2301","Guardare los datos en el struct");
-         	sprintf(form1.Humedad1,"%d",auxi3);
-            sprintf(form1.Temperatura1,"%d",auxi4);
-            form1.Humedad2 = auxi3;
-            form1.Temperatura2 = auxi4;
-            sprintf(form1.Datos_Sensor,"%s",datos_sensor);
-            form1.Humedad3 = auxi3/10;
-            form1.Temperatura3 = auxi4/10;
-            ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3,form1.Temperatura3);
+            	//Guardar el valor de la temperatura
+            	auxi4 = (auxi2 + decimal_temp);
+     //       	ESP_LOGI("Sensor_AM2301","auxi4: %d", auxi4);
+            	//Poner en un string el valor de la temperatura
+            	sprintf(auxc2,"%d",auxi4);
+     //       	ESP_LOGI("Sensor_AM2301","auxc2: %s", auxc2);
 
 
-  //          ESP_LOGI("Sensor_AM2301","Empezare a flashear");
+            	datos_sensor[20] = auxc1[0];
+            	datos_sensor[21] = auxc1[1];
+            	datos_sensor[23] = auxc1[2];
+     //       	ESP_LOGI("Sensor_AM2301","auxc1: %c", auxc1[0]);
+
+            	datos_sensor[43] = auxc2[0];
+                datos_sensor[44] = auxc2[1];
+            	datos_sensor[46] = auxc2[2];
+
+     //       	ESP_LOGI("Sensor_AM2301","Guardare los datos en el struct");
+             	sprintf(form1.Humedad1,"%d",auxi3);
+                sprintf(form1.Temperatura1,"%d",auxi4);
+                form1.Humedad2 = auxi3;
+                form1.Temperatura2 = auxi4;
+                sprintf(form1.Datos_Sensor,"%s",datos_sensor);
+                form1.Humedad3 = auxi3/10;
+                form1.Temperatura3 = auxi4/10;
+                ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3,form1.Temperatura3);
+
+
+      /*         ESP_LOGI("Sensor_AM2301","Empezare a flashear");
+                set_form_flash_init(form1);
+                get_form_flash(&form2);*/
+                sirve = 0;
+                prom_hum += form1.Humedad3;
+                prom_temp += form1.Temperatura3;
+                vuelta_temp++;
+
+                if (j1 == 16){
+                	form1.promedio_hum = prom_hum/16;
+                	form1.promedio_temp = prom_temp/16;
+                	sprintf(form1.Humedad1,"%.1f",form1.promedio_hum);
+                	sprintf(form1.Temperatura1,"%.1f",form1.promedio_temp);
+                	prom_temp = 0;
+                	prom_hum = 0;
+                }
+
+            	//xQueueSend(Cola_sensor,&datos_sensor,0/portTICK_PERIOD_MS);
+            }
+            else{
+                ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
+                sirve = 1;
+                xEventGroupSetBits(event_group, BEGIN_TASK1);
+            }
+    	}
+
+        if (sirve == 0 && vuelta_temp == 17){
             set_form_flash_init(form1);
             get_form_flash(&form2);
-            sirve = 0;
-
-        	//xQueueSend(Cola_sensor,&datos_sensor,0/portTICK_PERIOD_MS);
-        }
-        else{
-            ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
-            sirve = 1;
-            xEventGroupSetBits(event_group, BEGIN_TASK1);
-        }
-
-        if (sirve == 0){
+        	vuelta_temp = 0;
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
     		xEventGroupSetBits(event_group, BEGIN_TASK3);
         }
-
     }
 }

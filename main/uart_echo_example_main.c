@@ -15,6 +15,7 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 
 #define BUF_SIZE (1024)
 
@@ -22,7 +23,7 @@
 
 NMEA_data_t NMEA_data;
 
-
+extern const char *nvs_tag;
 
 int auxi1_echo = 0;
 int auxi2_echo = 0;
@@ -42,12 +43,8 @@ char auxc7_echo[1] = "B";
 uint16_t posicion_echo[13] = {0};
 
 
-//ciclo completo indica si ya se inicio previamente el GPS, para no volver a pasar por AT OK ni AT + GPS
-//bool ciclo_completo = false;
 float prom_lon = 0;
 float prom_lat = 0;
-
-
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
@@ -69,6 +66,117 @@ extern const int BEGIN_TASK3;
 
 
 static const char *TAG1 = "uart_echo_example";
+
+void set_form_flash_init1(gps_data_t *GPS_data){
+	esp_err_t err;
+	nvs_handle_t ctrl_flash;
+	err = nvs_open("storage2",NVS_READWRITE,&ctrl_flash);
+	if (err != ESP_OK) {
+		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+	}else{
+		ESP_LOGI("NVS_FLASH","Latitud a guardar en flash: %s",GPS_data->latitude_s);
+		nvs_set_str(ctrl_flash,"latitude_s",GPS_data->latitude_s);
+
+		ESP_LOGI("NVS_FLASH","Longitud a guardar en flash: %s",GPS_data->longitude_s);
+		nvs_set_str(ctrl_flash,"longitude_s",GPS_data->longitude_s);
+
+		ESP_LOGI("NVS_FLASH","Latitude direct a guardar en flash: %s",GPS_data->latitude_direct);
+		nvs_set_str(ctrl_flash,"latitude_direct",GPS_data->latitude_direct);
+
+		ESP_LOGI("NVS_FLASH","Longitude direct a guardar en flash: %s",GPS_data->longitude_direct);
+		nvs_set_str(ctrl_flash,"logitude_direct",GPS_data->longitude_direct);
+
+		err = nvs_commit(ctrl_flash);
+	}
+	nvs_close(ctrl_flash);
+
+}
+
+void get_form_flash1(gps_data_t *GPS_data){
+	size_t leni;
+	esp_err_t err;
+	nvs_handle_t ctrl_flash;
+
+	err = nvs_open("storage2",NVS_READWRITE,&ctrl_flash);
+	if (err != ESP_OK) {
+		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+	}else{
+
+		err = nvs_get_str(ctrl_flash,"latitude_s",NULL,&leni);
+		if(err==ESP_OK) {
+			err = nvs_get_str(ctrl_flash,"latitude_s",GPS_data->latitude_s,&leni);
+			switch(err){
+				case ESP_OK:
+					ESP_LOGI(nvs_tag,"latitude en flash: %s",GPS_data->latitude_s);
+				break;
+				case ESP_ERR_NVS_NOT_FOUND:
+					ESP_LOGI(nvs_tag,"latitude en flash: none");
+				break;
+				default:
+					printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+				break;
+			}
+		}
+
+		err = nvs_get_str(ctrl_flash,"latitude_direct",NULL,&leni);
+		if(err==ESP_OK){
+			err= nvs_get_str(ctrl_flash,"latitude_direct",GPS_data->latitude_direct,&leni);
+		switch(err){
+			case ESP_OK:
+				ESP_LOGI(nvs_tag,"latitude_direct en flash: %s",GPS_data->latitude_direct);
+			break;
+			case ESP_ERR_NVS_NOT_FOUND:
+				ESP_LOGI(nvs_tag,"latitude_direct en flash: none");
+			break;
+			default:
+				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+			break;
+		}
+		}
+
+		err = nvs_get_str(ctrl_flash,"longitude_s",NULL,&leni);
+		if(err==ESP_OK){
+			err= nvs_get_str(ctrl_flash,"longitude_s",GPS_data->longitude_s,&leni);
+		switch(err){
+			case ESP_OK:
+				ESP_LOGI(nvs_tag,"longitude en flash: %s",GPS_data->longitude_s);
+			break;
+			case ESP_ERR_NVS_NOT_FOUND:
+				ESP_LOGI(nvs_tag,"longitude en flash: none");
+			break;
+			default:
+				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+			break;
+		}
+		}
+	}nvs_close(ctrl_flash);
+
+	err = nvs_open("storage2",NVS_READWRITE,&ctrl_flash);
+	if (err != ESP_OK) {
+		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+	}else{
+
+		err = nvs_get_str(ctrl_flash,"longitude_direct",NULL,&leni);
+		if(err==ESP_OK){
+			err= nvs_get_str(ctrl_flash,"longitude_direct",GPS_data->longitude_direct,&leni);
+		switch(err){
+			case ESP_OK:
+				ESP_LOGI(nvs_tag,"longitude_direct en flash: %s",GPS_data->longitude_direct);
+			break;
+			case ESP_ERR_NVS_NOT_FOUND:
+				ESP_LOGI(nvs_tag,"longitude_direct en flash: none");
+			break;
+			default:
+				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+			break;
+		}
+		}
+	}nvs_close(ctrl_flash);
+
+
+
+}
+
 
 /*
 static void GGA_parsing(char* GNGGA_data, gps_data_t GPS_data )
@@ -378,6 +486,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 
 			if (ronda == 10){
 				GPS_data->latitude_prom = prom_lat/10;
+				sprintf(GPS_data->latitude_s,"%.4f",GPS_data->latitude_prom);
 				ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
 			}
 
@@ -431,6 +540,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 
 			if (ronda == 10){
 				GPS_data->longitude_prom = prom_lon/10;
+				sprintf(GPS_data->longitude_s,"%.4f",GPS_data->longitude_prom);
 				ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
 			}
 
@@ -636,6 +746,12 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     uint8_t * parar_RTC1 = (uint8_t * ) malloc(10);
     parar_RTC1 = 0;
 
+    //variable para reiniciar el A9G si no responde AT OK en 10 intentos
+    uint8_t reinicio = 0;
+
+    //variable para ignorar el gps
+    uint8_t reinicio2 = 0;
+
 
     // char com[3] = {0x41, 0x54, 0x0D};
     char *com = {"AT\r\n"};
@@ -649,6 +765,11 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     char *com3 = "AT+GPSRD=1\r\n";
     int len6 = 12;
     int len7 = 0;
+
+    char *com4 = "AT+RST=1\r\n";
+    int len8 = 10;
+
+
 
     while (1) {
 
@@ -727,16 +848,16 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	     		if (auxi3_echo == 1 && parar_RTC1 == 0){
     	     			ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
 
-    	     			int i2 = 0;
-    	     			//En este for escanea el buffer por la posicion de $
-    	     			for (uint16_t i = 0; i < len; i++){
-    	     				if (auxc2_echo[i] == auxc5_echo[0] ){
-    	     			    	posicion_echo[i2] = i;
-    	     			    /*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
-    	     			    	ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
-    	     			    	i2++;
-    	     			    }
-    	     			}
+       	     			int i2 = 0;
+        	     			//En este for escanea el buffer por la posicion de $
+        	     			for (uint16_t i = 0; i < len; i++){
+        	     				if (auxc2_echo[i] == auxc5_echo[0] ){
+        	     			    	posicion_echo[i2] = i;
+        	     			    /*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
+        	     			    	ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
+        	     			    	i2++;
+        	     			    }
+        	     			}
     	     			// Empezare a guardar en el struct escaladamente segun la posicion de $
     	     			// Se guardara cada oracion por separado
     	     			int i3 = 0;
@@ -784,11 +905,11 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	     			}
     	     			}
 
-    	     		/*	ESP_LOGI(TAG1,"GPGSA es: %s\r\n",NMEA_data.NMEA_GPGSA);
+    	     			ESP_LOGI(TAG1,"GPGSA es: %s\r\n",NMEA_data.NMEA_GPGSA);
     	     			ESP_LOGI(TAG1,"BDGSA es: %s\r\n",NMEA_data.NMEA_BDGSA);
     	     			ESP_LOGI(TAG1,"GPGSV1 es: %s\r\n",NMEA_data.NMEA_GPGSV1);
     	     			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
-    	     			ESP_LOGI(TAG1,"GNVTG es: %s\r\n",NMEA_data.NMEA_GNVTG);*/
+    	     			ESP_LOGI(TAG1,"GNVTG es: %s\r\n",NMEA_data.NMEA_GNVTG);
 
 
     	     			//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
@@ -808,8 +929,11 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     					auxi2_echo = 0;
     					auxi3_echo = 0;
     					parar_RTC1 = (uint8_t *) 1;
+    					set_form_flash_init1(&gps_data);
+    					get_form_flash1(&gps_data2);
     					//Tambien para el envio de datos del GPSRD
     					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+    					len = 0;
     				    xEventGroupClearBits(event_group, BEGIN_TASK3);
     				    xEventGroupSetBits(event_group, BEGIN_TASK2);
     	     		}
@@ -856,6 +980,19 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        	       }
     	        	       if (auxi1_echo == 0 && parar_RTC1 == 0){
     	        	    	   ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
+    	        	    	   reinicio++;
+    	        	    	   ESP_LOGI(TAG1, "1- Reinicio es: %d", reinicio);
+    	        	    	   if (reinicio == 11){
+    	        	    		   reinicio2++;
+    	        	    		   reinicio = 0;
+    	        	    		   ESP_LOGI(TAG1, "1- Reinicio2 es: %d", reinicio2);
+    	        	    		   len = uart_write_bytes(UART_NUM_2,com4,len8);
+    	        	    		   len = 0;
+    	        	    	   }
+    	        	    	   if (reinicio2 == 2){
+    	        	    		   xEventGroupClearBits(event_group, BEGIN_TASK3);
+    	        	    		   xEventGroupSetBits(event_group, BEGIN_TASK2);
+    	        	    	   }
     	        	       }
 
     	        	}
@@ -870,6 +1007,18 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	}
 
     	if (len <= 0){
+    		reinicio++;
+	    	if (reinicio == 11){
+	        	    reinicio2++;
+	        	    reinicio = 0;
+	        	    ESP_LOGI(TAG1, "1- Reinicio2 es: %d", reinicio2);
+	        	    len = uart_write_bytes(UART_NUM_2,com4,len8);
+	        	    len = 0;
+	        }
+	        if (reinicio2 == 2){
+	        	    xEventGroupClearBits(event_group, BEGIN_TASK3);
+	        	    xEventGroupSetBits(event_group, BEGIN_TASK2);
+	        }
     	vTaskDelay( pdMS_TO_TICKS(1000) );
     	ESP_LOGI(TAG1, "2+ Espere 1 segundo");
     	}

@@ -42,6 +42,7 @@
 #define BUF_SIZE (1024)
 #include "NMEA_setting.h"
 
+extern uint8_t reinicio2 = 0;
 
 
 //#define BROKER_URL "mqtt://kike:Kike3355453@mqtt.tiosplatform.com"
@@ -260,9 +261,9 @@ void Mandar_mensaje(void *P)
 
     ESP_ERROR_CHECK(esp_netif_init());
     if (vuelta_men == 0){
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, NULL));
+    	 ESP_ERROR_CHECK(esp_event_loop_create_default());
+    	    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
+    	    ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, NULL));
     }
 
 
@@ -271,6 +272,9 @@ void Mandar_mensaje(void *P)
     	ESP_LOGI(TAG, "La latitud dir es: %s", gps_data.latitude_direct);
         ESP_LOGI(TAG, "La longitud prom es: %f", gps_data.longitude_prom);
       	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);
+      	ESP_LOGI(TAG, "La hum prom es: %s", form1.Humedad1);
+      	ESP_LOGI(TAG, "La temp prom es: %s", form1.Temperatura1);
+
 
 
 
@@ -289,9 +293,9 @@ void Mandar_mensaje(void *P)
 
     // Init netif object
     if (vuelta_men == 0){
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
-    esp_netif_t *esp_netif = esp_netif_new(&cfg);
-    assert(esp_netif);
+        esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
+        esp_netif_t *esp_netif = esp_netif_new(&cfg);
+        assert(esp_netif);
     }
 
     /* create dte object */
@@ -333,17 +337,29 @@ void Mandar_mensaje(void *P)
 #endif*/
 
 
+
+ //   sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[3],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[3]);
+if (reinicio2 == 2){
 #if CONFIG_EXAMPLE_SEND_MSG
-    sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
+    sprintf(message,"No fue posible conectarse a la red GPS");
     ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     ESP_LOGI(TAG, "Send send message [%s] ok", message);
 #endif
-
+    reinicio2 = 0;
+}else{
 #if CONFIG_EXAMPLE_SEND_MSG
     sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
     ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     ESP_LOGI(TAG, "Send send message [%s] ok", message);
 #endif
+}
+
+#if CONFIG_EXAMPLE_SEND_MSG
+    sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",form1.promedio_hum,form1.promedio_temp);
+    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    ESP_LOGI(TAG, "Send send message [%s] ok", message);
+#endif
+
 #if CONFIG_EXAMPLE_SEND_MSG
     sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
     ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));

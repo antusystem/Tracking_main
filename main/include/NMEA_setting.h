@@ -31,17 +31,19 @@ typedef struct {
 } NMEA_data_t;
 
 typedef struct {
-    float latitude[10];                                                /*!< Latitude (degrees) */
+    float latitude[20];                                                /*!< Latitude (degrees) */
+    char latitude_s[20];
     float latitude_prom;
     char latitude_direct[20];
     float longitude[10];                                               /*!< Longitude (degrees) */
+    char longitude_s[20];
     float longitude_prom;
     char longitude_direct[20];
     float altitude;                                                /*!< Altitude (meters) */
     char estado[2];
     uint8_t fix;                                                 /*!< Fix status */
     uint8_t sats_in_use;                                           /*!< Number of satellites in use */
-    int hour;      /*!< Hour */
+    uint8_t hour;      /*!< Hour */
     uint8_t minute;    /*!< Minute */
     uint8_t second;    /*!< Second */
     uint8_t day;   /*!< Day (start from 1) */
@@ -98,6 +100,7 @@ typedef struct {
 } rmc_data_t;
 
 gps_data_t gps_data;
+gps_data_t gps_data2;
 
 void echo_task(void *P);
 

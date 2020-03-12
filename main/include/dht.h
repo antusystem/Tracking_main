@@ -3,13 +3,15 @@
 #include "stdint.h"
 
 struct form_home{
-	char Humedad1[6];
-	char Temperatura1[6];
+	char Humedad1[20];
+	char Temperatura1[20];
 	uint16_t Humedad2;
 	uint16_t Temperatura2;
 	char Datos_Sensor[60];
 	float Humedad3;
 	float Temperatura3;
+	float promedio_hum;
+	float promedio_temp;
 };
 
 

@@ -377,12 +377,11 @@ void app_main(void)
 	        gpio_pad_select_gpio(SIM800l_PWR_KEY);
 	        gpio_pad_select_gpio(SIM800l_PWR);
 	        gpio_pad_select_gpio(SIM800l_RST);
-	        ESP_LOGI(TAG, "Hola4");
 	        /*Configurar los GPIO como output, el RST como Open Drain por seguridad*/
 	        gpio_set_direction(SIM800l_PWR_KEY, GPIO_MODE_OUTPUT);
 	        gpio_set_direction(SIM800l_PWR, GPIO_MODE_OUTPUT);
 	        gpio_set_direction(SIM800l_RST, GPIO_MODE_OUTPUT_OD);
-	        ESP_LOGI(TAG, "Hola5");
+
 	event_group = xEventGroupCreate();
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", Pila*3, NULL, 8, NULL,0);

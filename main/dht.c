@@ -14,7 +14,7 @@
 #define us_retardo 1
 #define numDHT_bits 40
 #define numDHT_bytes 5
-#define DHTpin 18
+#define DHTpin 19
 
 
 extern EventGroupHandle_t event_group;
@@ -23,7 +23,7 @@ extern const int BEGIN_TASK1;
 
 extern const int BEGIN_TASK2;
 
-//extern const int BEGIN_TASK3;
+extern const int BEGIN_TASK3;
 
 
 const char *nvs_tag = "NVS";
@@ -325,7 +325,7 @@ void TareaDHT(void *P){
 
         if (sirve == 0){
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
-    		xEventGroupSetBits(event_group, BEGIN_TASK2);
+    		xEventGroupSetBits(event_group, BEGIN_TASK3);
         }
 
     }

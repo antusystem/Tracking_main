@@ -8,7 +8,6 @@
 */
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -16,20 +15,19 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
+//Defino el tamano del buffer de recepcion de datos GPS
+//Con el modulo A9G los buses llegan por segundo y tienden a ser un string
+//de aproximadament 282 caracteres
 #define BUF_SIZE (1024)
 
 #include "NMEA_setting.h"
 
 NMEA_data_t NMEA_data;
 
-
-
+//Se definen auxiliares
 int auxi1_echo = 0;
 int auxi2_echo = 0;
 int auxi3_echo = 0;
-int ronda = 0;
-
-
 
 char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
 char auxc2_echo[BUF_SIZE] = "";
@@ -39,16 +37,14 @@ char auxc5_echo[1] = "$";
 char auxc6_echo[BUF_SIZE] = "";
 char auxc7_echo[1] = "B";
 
+//Ronda servira para indicar la ronda en que se encuentra pidiendo los datos GPS
+int ronda = 0;
+
+//posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
 uint16_t posicion_echo[13] = {0};
 
-
-//ciclo completo indica si ya se inicio previamente el GPS, para no volver a pasar por AT OK ni AT + GPS
-//bool ciclo_completo = false;
 float prom_lon = 0;
 float prom_lat = 0;
-
-
-
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
 #define ECHO_TEST_RXD  (GPIO_NUM_5)
@@ -66,10 +62,11 @@ extern const int BEGIN_TASK2;
 extern const int BEGIN_TASK3;
 
 
-
-
 static const char *TAG1 = "uart_echo_example";
 
+//La siguiente funcion organiza los datos de una oracion GGA del GPS
+//Fue comentada porque no es necesaria para lo que se necesita mostrar
+//Si se piensa usar de debe quitar void y definir la variable a retornar
 /*
 static void GGA_parsing(char* GNGGA_data, gps_data_t GPS_data )
 {
@@ -547,6 +544,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 {
 
+	//Esta funcion identificara que tipo datos (dentro de los soportados) es la oracion y lo organizara
 /*	char GSA[3] = "GSA";
 	char GSV[3] = "GSV";
 	char VTG[3] = "VTG";
@@ -554,7 +552,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 	char RMC[3] = "RMC";
 
 
-	//Se crean las variables auxiliares para comprobar de que tipo son luego se llama la funcion que lo ordenara
+	//Se crean las variables auxiliares para comprobar de que tipo son luego se llama
+	//la funcion que lo ordenara
 
 /*	if (data[2] == GGA[0] && data[3] == GGA[1] && data[4] == GGA[2]){
 
@@ -603,7 +602,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
   void echo_task(void *arg)
 {
-
+	//Se inicia la tarea configurando los Uart 0 y Uart 2
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -627,27 +626,31 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
     ESP_LOGI(TAG1, "Uart 2 Iniciado");
 
+    //Se declara la
     // Configure a temporary buffer for the incoming data
     //uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
     uint8_t tx_buf[BUF_SIZE];
 
-
-    //Declaro la variable booleana false por si para cuando vuelva a entrar a esta tarea
+    //Esta variable sirve para indicar cuando pedir que no siga enviando los datos GPS
     uint8_t * parar_RTC1 = (uint8_t * ) malloc(10);
     parar_RTC1 = 0;
 
 
-    // char com[3] = {0x41, 0x54, 0x0D};
-    char *com = {"AT\r\n"};
+    // Se definen los comandos AT que seran enviados con su longitud y un auxiliar
+    // Se ignoraron ya que puede ponerse directamente en la funcion
+/*  char *com = {"AT\r\n"};
     int len2 =  4;
-    int len3 = 0;
+
 
     char *com2 = "AT+GPS=1\r\n";
     int len4 = 10;
-    int len5 = 0;
+
 
     char *com3 = "AT+GPSRD=1\r\n";
-    int len6 = 12;
+    int len6 = 12;*/
+
+    int len3 = 0;
+    int len5 = 0;
     int len7 = 0;
 
     while (1) {
@@ -662,127 +665,128 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	ESP_LOGI(TAG1, "Limpiare tx_buf");
     	bzero(tx_buf,BUF_SIZE);
 
-    	// Empezare escaladamente a mandar lo comandos AT necesarios en cada vuelta
+    	// Empezara escaladamente a mandar lo comandos AT necesarios en cada vuelta
 
-    	//Vuelta 3 pidiendo que envie los datos del GPS
-    	if (auxi2_echo == 1 && auxi3_echo == 0 && parar_RTC1 == 0){
-
-    	        len7 = uart_write_bytes(UART_NUM_2,com3, len6);
-    	        ESP_LOGI(TAG1, "envio: %s",com3);
-    	        auxi3_echo = 1 ;
+    	if (parar_RTC1 == 0){
+    	switch (auxi1_echo){
+    	case 0:
+    		//En la primera vuelta manda AT para ver si la comunicacion ya se puede establecer
+	        len3 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
+	        ESP_LOGI(TAG1, "envio: AT\r\n");
+	    break;
+    	case 1:
+    		//En la segunda vuelta activa el GPS
+    		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
+    		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
+    	break;
+    	case 2:
+    		//En la tercera vuelta solicita los datos del GPS
+    		len7 = uart_write_bytes(UART_NUM_2,"AT+GPSRD=1\r\n", 12);
+    		ESP_LOGI(TAG1, "envio: AT+GPSRD=1\r\n");
+		break;
+    	}
     	}
 
-    	//Vuelta 2 prendiendo el GPS
-    	if (auxi1_echo == 1 && auxi2_echo == 0 && parar_RTC1 == 0){
-
-    	        len5 = uart_write_bytes(UART_NUM_2,com2, len4);
-    	        ESP_LOGI(TAG1, "envio: %s",com2);
-    	}
-    	//Vuelta 1 revisando si hay comunicacion con el modulo A9G
-    	if (auxi1_echo == 0 && parar_RTC1 == 0){
-
-    	        len3 = uart_write_bytes(UART_NUM_2,com, len2);
-    	        ESP_LOGI(TAG1, "envio: %s",com);
-    	}
-
-
-    	//Cuando se envia algo len se vuelve la longitud d elo que se envio
+    	//Cuando se envia algo len se vuelve la longitud de lo que se envio
     	//si no se envio nada, entonces no estrara en esta parte. Ademas,
     	// len7 no se reinicia para que luego de pedir los datos GPS siempre entre
     	if ((len3 > 0) || (len5 > 0) || (len7 > 0) ) {
 
     		//Lee el uart
-    			ESP_LOGI(TAG1, "Voy a leer el uart");
-    	     	len = uart_read_bytes(UART_NUM_2, (uint8_t*)tx_buf, BUF_SIZE, pdMS_TO_TICKS(10));
-    	     	ESP_LOGI(TAG1, "len es: %d",len);
+    		ESP_LOGI(TAG1, "Voy a leer el uart");
+    	    len = uart_read_bytes(UART_NUM_2, (uint8_t*)tx_buf, BUF_SIZE, pdMS_TO_TICKS(10));
+    	    ESP_LOGI(TAG1, "len es: %d",len);
 
-    	     	//Se comprueba si llego algo al uart y se publica que llego
-    	     	if(len>0){
-    	     		ESP_LOGI(TAG1, "Borrare auxc2");
-    	     		// Borrar lo que tenia antes auxc2
-    	     		bzero(auxc2_echo,BUF_SIZE);
-    	     		// Mostar que se borro todo
-    	     		ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
-    	     		// Copiar lo que esta en el buffer de recepcion
-
-    	     		if (auxi3_echo == 0){
-    	     			memcpy(auxc2_echo,tx_buf,20);
-    	     		} else {
-    	     			memcpy(auxc2_echo,tx_buf,BUF_SIZE);
-    	     		}
+    	    //Se comprueba si llego algo al uart y se publica que llego
+    	    if(len>0){
+    	     	ESP_LOGI(TAG1, "Borrare auxc2");
+    	     	// Borrar lo que tenia antes auxc2
+    	     	bzero(auxc2_echo,BUF_SIZE);
+    	     	// Mostar que se borro todo
+    	     	ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
+    	     	// Copiar lo que esta en el buffer de recepcion
 
 
-    	     		//Mostrar auxc2
-    	     		ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
-    	     		//printf(" Copio el buffer, auxc2 es: %s",auxc2)
-    	     		ESP_LOGI(TAG1, " Ya termino auxc2");
-    	     		ESP_LOGI(TAG1, "ronda es: %d",ronda);
+    	     	//Se copia lo que llego al buffer, las primeras 2 veces no hace falta que
+    	     	//tenga una dimension tan grande el auxiliar
+    	     	if (auxi3_echo < 2){
+    	     		memcpy(auxc2_echo,tx_buf,20);
+    	     	} else {
+    	     		memcpy(auxc2_echo,tx_buf,BUF_SIZE);
+    	     	}
 
 
-    	     		//Empezare a ver escaladamente como comprueba ATOK, ATGPS y ATGPSRD
+    	     	//Mostrar auxc2
+    	     	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
+    	     	//printf(" Copio el buffer, auxc2 es: %s",auxc2)
+    	     	ESP_LOGI(TAG1, " Ya termino auxc2");
+    	     	ESP_LOGI(TAG1, "ronda es: %d",ronda);
 
 
-    	     		//Entrara aca despues de mandar AT+GPSRD=1
-    	     		//En este ciclo se encarga de separar las oraciones del bus NMEA del GPS
-    	     		if (auxi3_echo == 1 && parar_RTC1 == 0){
-    	     			ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
 
-    	     			int i2 = 0;
-    	     			//En este for escanea el buffer por la posicion de $
-    	     			for (uint16_t i = 0; i < len; i++){
-    	     				if (auxc2_echo[i] == auxc5_echo[0] ){
-    	     			    	posicion_echo[i2] = i;
-    	     			    /*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
-    	     			    	ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
+
+
+    	     	//Entrara aca despues de mandar AT+GPSRD=1
+    	     	//En este ciclo se encarga de separar las oraciones del bus NMEA del GPS
+    	     	if (auxi1_echo == 2 && parar_RTC1 == 0){
+    	     		ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
+
+    	     		int i2 = 0;
+    	     		//En este for escanea el buffer por la posicion de $
+    	     		for (uint16_t i = 0; i < len; i++){
+    	     			if (auxc2_echo[i] == auxc5_echo[0] ){
+    	     			    posicion_echo[i2] = i;
+    	     			   /*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
+    	     			    ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
     	     			    	i2++;
-    	     			    }
     	     			}
-    	     			// Empezare a guardar en el struct escaladamente segun la posicion de $
-    	     			// Se guardara cada oracion por separado
-    	     			int i3 = 0;
-    	     			for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
-    	     				NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
-    	     				i3++;
-    	     			}
-    	     			i3 = 0;
-    	     			for (int i = posicion_echo[1] + 1; i < (posicion_echo[2]-1); i++){
-    	     				NMEA_data.NMEA_GPGSA[i3]= tx_buf[i];
-    	     				i3++;
-    	     			}
-    	     			i3 = 0;
-    	     			for (int i = posicion_echo[2] + 1; i < (posicion_echo[3]-1); i++){
-    	     				NMEA_data.NMEA_BDGSA[i3]= tx_buf[i];
-    	     				i3++;
-    	     			}
-    	     			i3 = 0;
-    	     			for (int i = posicion_echo[3] + 1; i < (posicion_echo[4]-1); i++){
-    	     				NMEA_data.NMEA_GPGSV1[i3]= tx_buf[i];
-    	     				i3++;
-    	     			}
-    	     			//Cuando se conecte a los satelites mandara de 3 a 12 oraciones GPGSV, por lo que
-    	     			// se guarda la primera y se espera los siguientes datos, comprobando que comience por B
-    	     			// la siguiente oracion y no por G
-    	     			for (int j = 4; j < 10; j++){
-    	     			//j = 4 porque se ve de las siguientes oraciones donde esta la B para empezar a guardar
+    	     		}
+    	     		// Empezare a guardar en el struct escaladamente segun la posicion de $
+    	     		// Se guardara cada oracion por separado
+    	     		int i3 = 0;
+    	     		for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
+    	     			NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
+    	     			i3++;
+    	     		}
+    	     		i3 = 0;
+    	     		for (int i = posicion_echo[1] + 1; i < (posicion_echo[2]-1); i++){
+    	     			NMEA_data.NMEA_GPGSA[i3]= tx_buf[i];
+    	     			i3++;
+    	     		}
+    	     		i3 = 0;
+    	     		for (int i = posicion_echo[2] + 1; i < (posicion_echo[3]-1); i++){
+    	     			NMEA_data.NMEA_BDGSA[i3]= tx_buf[i];
+    	     			i3++;
+    	     		}
+    	     		i3 = 0;
+    	     		for (int i = posicion_echo[3] + 1; i < (posicion_echo[4]-1); i++){
+    	     			NMEA_data.NMEA_GPGSV1[i3]= tx_buf[i];
+    	     			i3++;
+    	     		}
+    	     		//Cuando se conecte a los satelites mandara de 3 a 12 oraciones GPGSV, por lo que
+    	     		// se guarda la primera y se espera los siguientes datos, comprobando que comience por B
+    	     		// la siguiente oracion y no por G
+    	     		for (int j = 4; j < 10; j++){
+    	     		//j = 4 porque se ve de las siguientes oraciones donde esta la B
+    	     		//para empezar a guardar
     	     			i3 = 0;
     	     			if (tx_buf[posicion_echo[j]+1] == auxc7_echo[0]){
-        	     			for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
-        	     				NMEA_data.NMEA_BDGSV[i3]= tx_buf[i];
-        	     				i3++;
-        	     			}
-        	     			i3 = 0;
-        	     			for (int i = posicion_echo[j+1] + 1; i < (posicion_echo[j+2]-1); i++){
-        	     				NMEA_data.NMEA_GNRMC[i3]= tx_buf[i];
-        	     				i3++;
-        	     			}
-        	     			i3 = 0;
-        	     			for (int i = posicion_echo[j+2] + 1; i < (posicion_echo[j+2]+39); i++){
-        	     				NMEA_data.NMEA_GNVTG[i3]= tx_buf[i];
-        	     				i3++;
-        	     			}
-
+    	     				for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
+    	     					NMEA_data.NMEA_BDGSV[i3]= tx_buf[i];
+    	     					i3++;
+    	     				}
+    	     				i3 = 0;
+    	     				for (int i = posicion_echo[j+1] + 1; i < (posicion_echo[j+2]-1); i++){
+    	     					NMEA_data.NMEA_GNRMC[i3]= tx_buf[i];
+    	     					i3++;
+    	     				}
+    	     				i3 = 0;
+    	     				for (int i = posicion_echo[j+2] + 1; i < (posicion_echo[j+2]+39); i++){
+    	     					NMEA_data.NMEA_GNVTG[i3]= tx_buf[i];
+    	     					i3++;
+    	     				}
     	     			}
-    	     			}
+    	     		}
 
     	     		/*	ESP_LOGI(TAG1,"GPGSA es: %s\r\n",NMEA_data.NMEA_GPGSA);
     	     			ESP_LOGI(TAG1,"BDGSA es: %s\r\n",NMEA_data.NMEA_BDGSA);
@@ -791,13 +795,12 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	     			ESP_LOGI(TAG1,"GNVTG es: %s\r\n",NMEA_data.NMEA_GNVTG);*/
 
 
-    	     			//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
+    	     		//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
     	     	//	GPS_parsing(NMEA_data.NMEA_GNGGA, gps_data);
-    	     		ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
 
+    	     		ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
     	     		gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
     	     		auxi3_echo = 1;
-    	     		//vTaskDelay( pdMS_TO_TICKS(500) );
     	     		if (ronda == 10 ){
     	     			//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     					ronda = 0;
@@ -805,10 +808,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     					prom_lat = 0;
     					prom_lon = 0;
     					auxi1_echo = 0;
-    					auxi2_echo = 0;
-    					auxi3_echo = 0;
     					parar_RTC1 = (uint8_t *) 1;
-    					//Tambien para el envio de datos del GPSRD
+    					//Para detener el envio de datos del GPS se manda lo siguiente
     					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
     				    xEventGroupClearBits(event_group, BEGIN_TASK3);
     				    xEventGroupSetBits(event_group, BEGIN_TASK2);
@@ -820,58 +821,62 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
 
 
-    	     		/*//Entrare aca cuando mande AT+GPSRD = 1
-    	     		 // Fue omitida ya que a veces no respondia a tiempo OK por lo no cambiaba auxi3
-    	     		  // y daba errores
-    	        	if (auxi2 == 1 && auxi3 == 0 ){
-
-    	        	    	if (strncmp(auxc2,auxc4,6) == 0){
-    	         	    	   ESP_LOGI(TAG1, "3- Respondio AT+GSPRD=1 OK \r\n");
-    	         	    	   auxi3 = 1 ;
-    	         	        }
-    	        	    	if (auxi2 == 0){
-    	        	    	   ESP_LOGI(TAG1, "3- NO respondio AT+GPSRD=1 OK \r\n");
-    	        	    	}
-    	        	} */
 
 
-    	        	//Verificar si ya dijo AT GPS OK
-    	        	if (auxi1_echo == 1 && auxi2_echo == 0 && parar_RTC1 == 0){
+    	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y ATGPSRD
 
-    	        	    	if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
-    	         	    	   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
-    	         	    	   auxi2_echo = 1;
-    	         	    	   len5 = 0;
-    	         	        }
-    	        	    	 if (auxi2_echo == 0){
-    	        	    	   ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 OK \r\n");
-    	        	    	 }
+
+    	        	if (parar_RTC1 == 0){
+
+    	        		switch (auxi1_echo){
+    	        		case 0:
+    	        			//En el caso 0 verifica si respondio AT OK
+    	        			if (strncmp(auxc2_echo,auxc1_echo,10) == 0){
+    	        				ESP_LOGI(TAG1, "1- Respondio AT OK \r\n");
+    	         	        	auxi1_echo++;
+    	         	        	len3 = 0;
+    	         	        } else {
+     	        	    	    ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
+     	        	        }
+    	        		break;
+    	        		case 1:
+    	        			if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
+    	        			    ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
+    	        			    auxi1_echo++;
+    	        			    len5 = 0;
+    	        			} else {
+     	        	    	   ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 OK \r\n");
+     	        	    	}
+    	        		break;
+    	        		//Este caso causa molestia de vez en cuando y aparte no es necesario
+    	        		//para verificar si llegan los datos
+    	        	/*	case 2:
+      	        	    	if (strncmp(auxc2_echo,auxc4_echo,6) == 0){
+        	         	    	ESP_LOGI(TAG1, "3- Respondio AT+GSPRD=1 OK \r\n");
+        	         	    	auxi1_echo++;
+        	         	    } else {
+        	        	    	ESP_LOGI(TAG1, "3- NO respondio AT+GPSRD=1 OK \r\n");
+        	        	    }
+      	        	    break;*/
+    	        		}
+
     	        	}
-    	     		//Verificar si ya dijo AT OK
-    	        	if (auxi1_echo == 0 && parar_RTC1 == 0){
-    	        	       if (strncmp(auxc2_echo,auxc1_echo,10) == 0){
-    	        	    	   ESP_LOGI(TAG1, "1- Respondio AT OK \r\n");
-    	        	    	   auxi1_echo = 1;
-    	        	    	   len3 = 0;
-    	        	       }
-    	        	       if (auxi1_echo == 0 && parar_RTC1 == 0){
-    	        	    	   ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
-    	        	       }
 
+    	        	if (parar_RTC1 == 1){
+    	        		 ESP_LOGI(TAG1, "4- Para RTC es true \r\n");
+    	        		 vTaskDelay( pdMS_TO_TICKS(3000) );
     	        	}
-	        	       if ( parar_RTC1 == 1){
-	        	    	   ESP_LOGI(TAG1, "4- Para RTC es true \r\n");
-	        	    	   vTaskDelay( pdMS_TO_TICKS(3000) );
-	        	       }
 
+    	        	//Espera un segundo que es el tiempo optimo de espera para solicitar los datos
 	        	    vTaskDelay( pdMS_TO_TICKS(1000) );
     	     		ESP_LOGI(TAG1, " 1+ Espere 1 segundos");
     	     	}
     	}
 
+    	//Entra aqui si no se envio nada
     	if (len <= 0){
-    	vTaskDelay( pdMS_TO_TICKS(1000) );
-    	ESP_LOGI(TAG1, "2+ Espere 1 segundo");
+    		vTaskDelay( pdMS_TO_TICKS(1000) );
+    		ESP_LOGI(TAG1, "2+ Espere 1 segundo");
     	}
     }
 }

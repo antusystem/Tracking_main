@@ -324,7 +324,10 @@ void Mandar_mensaje(void *P)
     uint32_t voltage = 0, bcs = 0, bcl = 0;
     ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
     ESP_LOGI(TAG, "Battery voltage: %d mV", voltage);
-    /* setup PPPoS network parameters */
+
+    /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
+     y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
+     * */
 
 /*#if CONFIG_EXAMPLE_SEND_MSG
     char message[318] = "Welcome to ESP32!";
@@ -389,7 +392,7 @@ void app_main(void)
 	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 4, NULL,0);
 
 
-	 xEventGroupSetBits(event_group, BEGIN_TASK1);
+	 xEventGroupSetBits(event_group, BEGIN_TASK3);
 
 
 }

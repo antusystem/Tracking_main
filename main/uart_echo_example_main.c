@@ -25,8 +25,7 @@
 NMEA_data_t NMEA_data;
 
 //Se definen auxiliares
-int auxi1_echo = 0;
-int auxi2_echo = 0;
+int auxi1_echo = 0, auxi2_echo = 0;
 
 char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
 //El siguiente auxiliar se usa para tener otra variable con los datos que llegan al buffer de recepcion
@@ -47,6 +46,10 @@ uint16_t posicion_echo[13] = {0};
 //Variables globales para calcular promedios en varias funciones
 float prom_lon = 0;
 float prom_lat = 0;
+
+//error GPS es para saber si mando AT y le respondio AT OK
+uint8_t error_gps = 0, ronda_error = 0;
+
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
 #define ECHO_TEST_RXD  (GPIO_NUM_5)
@@ -738,6 +741,14 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	         	        len3 = 0;
     	         	    } else {
      	        	    	ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
+     	        	    	ronda_error++;
+     	        	    	if (ronda_error == 15){
+     	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+     	        	    		error_gps = 1;
+     	        	    		xEventGroupClearBits(event_group, BEGIN_TASK3);
+     	        	    		xEventGroupSetBits(event_group, BEGIN_TASK2);
+
+     	        	    	}
      	        	    }
     	        		break;
     	        	case 1:

@@ -42,9 +42,10 @@
 #define BUF_SIZE (1024)
 #include "NMEA_setting.h"
 
-//Para saber si se leyo la temperatura
+//Para saber si se leyo la temperatura y el gps
 
 extern uint8_t error_temp
+extern uint8_t error_gps
 
 
 
@@ -333,13 +334,6 @@ void Mandar_mensaje(void *P)
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
      * */
 
-/*#if CONFIG_EXAMPLE_SEND_MSG
-    char message[318] = "Welcome to ESP32!";
-    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    ESP_LOGI(TAG, "Send send message [%s] ok", message);
-#endif*/
-
-
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
     if (error_temp == 0){
 		#if CONFIG_EXAMPLE_SEND_MSG
@@ -348,6 +342,7 @@ void Mandar_mensaje(void *P)
     	ESP_LOGI(TAG, "Send send message [%s] ok", message);
 		#endif
     } else {
+    	error_temp = 0;
 		#if CONFIG_EXAMPLE_SEND_MSG
     	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
     	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
@@ -355,18 +350,37 @@ void Mandar_mensaje(void *P)
 		#endif
     }
 
+    if (error_gps == 0){
+
+    	if (gps_data.year == 20){
+			#if CONFIG_EXAMPLE_SEND_MSG
+    		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
+    		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			#endif
+
+			#if CONFIG_EXAMPLE_SEND_MSG
+    		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
+    		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			#endif
+    	} else{
+			#if CONFIG_EXAMPLE_SEND_MSG
+    		sprintf(message,"No se logro conectar a la red GPS.");
+    		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			#endif
+    	}
+    } else {
+		#if CONFIG_EXAMPLE_SEND_MSG
+    	sprintf(message,"No se logro conectar con el modulo GPS.");
+    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
+	#endif
+
+    }
 
 
-#if CONFIG_EXAMPLE_SEND_MSG
-    sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
-    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    ESP_LOGI(TAG, "Send send message [%s] ok", message);
-#endif
-#if CONFIG_EXAMPLE_SEND_MSG
-    sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
-    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    ESP_LOGI(TAG, "Send send message [%s] ok", message);
-#endif
 
 
     /* Power down module */

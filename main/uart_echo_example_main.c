@@ -47,8 +47,7 @@ uint16_t posicion_echo[13] = {0};
 float prom_lon = 0;
 float prom_lat = 0;
 
-//error GPS es para saber si mando AT y le respondio AT OK
-uint8_t error_gps = 0, ronda_error = 0;
+//Para saber si hay errores con la conexion GPS
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
@@ -657,6 +656,9 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     int len5 = 0;
     int len7 = 0;
 
+    gps_data.ronda_error = 0;
+    gps_data.error_gps = 0;
+
     while (1) {
 
     	xEventGroupWaitBits(event_group,BEGIN_TASK3,false,true,portMAX_DELAY);
@@ -741,10 +743,12 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	         	        len3 = 0;
     	         	    } else {
      	        	    	ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
-     	        	    	ronda_error++;
-     	        	    	if (ronda_error == 15){
+     	        	    	gps_data.ronda_error++;
+     	        	    	if (gps_data.ronda_error >= 15){
      	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
-     	        	    		error_gps = 1;
+     	        	    		gps_data.ronda_error = 0;
+     	        	    		gps_data.error_gps = 1;
+     	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
      	        	    		xEventGroupClearBits(event_group, BEGIN_TASK3);
      	        	    		xEventGroupSetBits(event_group, BEGIN_TASK2);
 
@@ -881,6 +885,17 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	if (len <= 0){
     		vTaskDelay( pdMS_TO_TICKS(1000) );
     		ESP_LOGI(TAG1, "2+ Espere 1 segundo");
+    		gps_data.ronda_error++;
+    		if (gps_data.ronda_error >= 15){
+    			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+    			gps_data.ronda_error = 0;
+    			gps_data.error_gps = 1;
+    			ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+    			xEventGroupClearBits(event_group, BEGIN_TASK3);
+    			xEventGroupSetBits(event_group, BEGIN_TASK2);
+
+    		}
+
     	}
     }
 }

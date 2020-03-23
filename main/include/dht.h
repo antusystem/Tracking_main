@@ -12,6 +12,8 @@ struct form_home{
 	float Temperatura3;
 	float Prom_hum;
 	float Prom_temp;
+	uint8_t vuelta_error;
+	uint8_t error_temp;
 };
 
 

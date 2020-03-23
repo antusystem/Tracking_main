@@ -55,6 +55,8 @@ typedef struct {
     float speed;                                                   /*!< Ground speed, unit: m/s */
     float cog;                                                     /*!< Course over ground */
     float variation;                                               /*!< Magnetic variation */
+    uint8_t error_gps;
+    uint8_t ronda_error;
 } gps_data_t;
 
 typedef struct {

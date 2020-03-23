@@ -226,7 +226,7 @@ void TareaDHT(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
-    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0, vuelta_error = 0, error_temp = 0;
+    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0;
     uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
     int auxi3 = 0, auxi4 = 0;
@@ -319,7 +319,7 @@ void TareaDHT(void *P){
          /*   set_form_flash_init(form1);
             get_form_flash(&form2);*/
             sirve = 0;
-            vuelta_error = 0;
+            form1.vuelta_error = 0;
 
             prom_hum += form1.Humedad3;
             prom_temp += form1.Temperatura3;
@@ -329,20 +329,22 @@ void TareaDHT(void *P){
         else{
             ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
             sirve = 1;
-            vuelta_error++;
+            form1.vuelta_error++;
+         //   if (form1.vuelta_error < 10){
+            	xEventGroupSetBits(event_group, BEGIN_TASK1);
+          //  }
             //Aqui verifico si ya tuve 10 errores seguidos midiendo la temperatura,
             //al 10mo sigue a la siguiente tarea y deja el flag error temp en 1
-            if (vuelta_error == 10){
-            	vuelta_error = 0;
-            	error_temp = 1;
+            if (form1.vuelta_error >= 10){
+            	form1.vuelta_error = 0;
+            	form1.error_temp = 1;
             	xEventGroupClearBits(event_group, BEGIN_TASK1);
             	xEventGroupSetBits(event_group, BEGIN_TASK3);
-            } else {
-            xEventGroupSetBits(event_group, BEGIN_TASK1);
+            	break;
             }
         }
 
-        if (sirve == 0 && vuelta_temp == 16){
+        if (sirve == 0 && vuelta_temp >=16){
         	vuelta_temp = 0;
         	form1.Prom_hum = prom_hum/16;
         	form1.Prom_temp = prom_temp/16;
@@ -351,6 +353,7 @@ void TareaDHT(void *P){
 
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
     		xEventGroupSetBits(event_group, BEGIN_TASK3);
+    		break;
         }
         }
     }

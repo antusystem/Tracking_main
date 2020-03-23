@@ -42,6 +42,10 @@
 #define BUF_SIZE (1024)
 #include "NMEA_setting.h"
 
+//Para saber si se leyo la temperatura
+
+extern uint8_t error_temp
+
 
 
 //#define BROKER_URL "mqtt://kike:Kike3355453@mqtt.tiosplatform.com"
@@ -336,11 +340,22 @@ void Mandar_mensaje(void *P)
 #endif*/
 
 
-#if CONFIG_EXAMPLE_SEND_MSG
-    sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
-    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    ESP_LOGI(TAG, "Send send message [%s] ok", message);
-#endif
+    //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
+    if (error_temp == 0){
+		#if CONFIG_EXAMPLE_SEND_MSG
+    	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
+    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
+		#endif
+    } else {
+		#if CONFIG_EXAMPLE_SEND_MSG
+    	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
+    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
+		#endif
+    }
+
+
 
 #if CONFIG_EXAMPLE_SEND_MSG
     sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);

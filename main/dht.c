@@ -154,8 +154,6 @@ void get_form_flash(struct form_home *form){
 
 
 
-// Variable global --------------------------------------------------
-//extern xQueueHandle Cola_sensor;
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 // Funcion para medir tiempo en us ----------------------------------
 static esp_err_t TiempoDeEspera(gpio_num_t pin,
@@ -228,10 +226,14 @@ void TareaDHT(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
-    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0;
+    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0, vuelta_error = 0, error_temp = 0;
     uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
-    int auxi3 = 0, auxi4 = 0, prom_temp = 0, prom_hum = 0;
+    int auxi3 = 0, auxi4 = 0;
+    float auxi3_f = 0, auxi4_f = 0, prom_temp = 0, prom_hum = 0;
+
+    //vuelta error indica cuantas vueltas a dado con error, si llega a 10 salta al GPS
+    // y con error temp se verifica cuando se envia el mensaje si se logro medir la temperatura
 
     char datos_sensor[]={"-Humedad Relativa = 00.0%\n\r-Temperatura = +00.0 C\n\n\r"};
 
@@ -241,7 +243,7 @@ void TareaDHT(void *P){
 
     	sirve = 0;
     	for (int j1 = 0; j1 < 16; j1++ ){
-    	ESP_LOGI("PRUEBA","Esperare 3 segundos");
+    //	ESP_LOGI("PRUEBA","Esperare 3 segundos");
     	vTaskDelay(3000 / portTICK_PERIOD_MS);
         if (leerDHT(DHTpin, &humedad, &decimal_hum, &temperatura, &decimal_temp, &signo_temp) == ESP_OK){
         	//Determinar el signo de la temperatura
@@ -306,10 +308,10 @@ void TareaDHT(void *P){
             form1.Humedad2 = auxi3;
             form1.Temperatura2 = auxi4;
             sprintf(form1.Datos_Sensor,"%s",datos_sensor);
-            form1.Humedad3 = auxi3/10;
-            form1.Temperatura3 = auxi4/10;
-            ESP_LOGI("Sensor_AM2301","humedad es: %s", form1.Humedad1);
-            ESP_LOGI("Sensor_AM2301","Temperatura es: %s", form1.Temperatura1);
+            auxi3_f = auxi3;
+            auxi4_f = auxi4;
+            form1.Humedad3 = auxi3_f/10;
+            form1.Temperatura3 = auxi4_f/10;
             ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3,form1.Temperatura3);
 
 
@@ -317,31 +319,35 @@ void TareaDHT(void *P){
          /*   set_form_flash_init(form1);
             get_form_flash(&form2);*/
             sirve = 0;
+            vuelta_error = 0;
 
-            prom_hum += auxi3;
-            prom_temp += auxi4;
+            prom_hum += form1.Humedad3;
+            prom_temp += form1.Temperatura3;
             vuelta_temp++;
-            ESP_LOGI("PRUEBA","La humedad es %d",prom_hum);
-            ESP_LOGI("PRUEBA","La temperatura es %d",prom_temp);
-            ESP_LOGI("PRUEBA","La vuelta es %d",vuelta_temp);
-
-
-
-
-        	//xQueueSend(Cola_sensor,&datos_sensor,0/portTICK_PERIOD_MS);
+            ESP_LOGI("Sensor_AM2301","La vuelta es: %d", vuelta_temp);
         }
         else{
             ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
             sirve = 1;
+            vuelta_error++;
+            //Aqui verifico si ya tuve 10 errores seguidos midiendo la temperatura,
+            //al 10mo sigue a la siguiente tarea y deja el flag error temp en 1
+            if (vuelta_error == 10){
+            	vuelta_error = 0;
+            	error_temp = 1;
+            	xEventGroupClearBits(event_group, BEGIN_TASK1);
+            	xEventGroupSetBits(event_group, BEGIN_TASK3);
+            } else {
             xEventGroupSetBits(event_group, BEGIN_TASK1);
+            }
         }
+
         if (sirve == 0 && vuelta_temp == 16){
         	vuelta_temp = 0;
-        	form1.Prom_hum = prom_hum/160;
-        	form1.Prom_temp = prom_temp/160;
-        	ESP_LOGI("PRUEBA","La humedad promedio es %f",form1.Prom_hum);
-        	ESP_LOGI("PRUEBA","La temperatura promedio es %f",form1.Prom_temp);
-
+        	form1.Prom_hum = prom_hum/16;
+        	form1.Prom_temp = prom_temp/16;
+        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
+        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);
 
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
     		xEventGroupSetBits(event_group, BEGIN_TASK3);

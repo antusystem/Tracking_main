@@ -10,6 +10,8 @@ struct form_home{
 	char Datos_Sensor[60];
 	float Humedad3;
 	float Temperatura3;
+	float Prom_hum;
+	float Prom_temp;
 };
 
 

@@ -228,10 +228,10 @@ void TareaDHT(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
-    uint8_t humedad = 0, decimal_hum = 0;
-    uint16_t auxi1 = 0, auxi2 = 0, auxi3 = 0, auxi4 = 0;
+    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0;
+    uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
-    int sirve = 0;
+    int auxi3 = 0, auxi4 = 0, prom_temp = 0, prom_hum = 0;
 
     char datos_sensor[]={"-Humedad Relativa = 00.0%\n\r-Temperatura = +00.0 C\n\n\r"};
 
@@ -240,6 +240,7 @@ void TareaDHT(void *P){
     	xEventGroupWaitBits(event_group,BEGIN_TASK1,true,true,portMAX_DELAY);
 
     	sirve = 0;
+    	for (int j1 = 0; j1 < 16; j1++ ){
     	ESP_LOGI("PRUEBA","Esperare 3 segundos");
     	vTaskDelay(3000 / portTICK_PERIOD_MS);
         if (leerDHT(DHTpin, &humedad, &decimal_hum, &temperatura, &decimal_temp, &signo_temp) == ESP_OK){
@@ -248,7 +249,7 @@ void TareaDHT(void *P){
         		datos_sensor[42]= '-';
         	}
 
-        	ESP_LOGI("Sensor_AM2301","Humedad %d.%d %% Temperatura: +%d.%dC",humedad,decimal_hum,temperatura,decimal_temp);
+        //	ESP_LOGI("Sensor_AM2301","Humedad %d.%d %% Temperatura: +%d.%dC",humedad,decimal_hum,temperatura,decimal_temp);
 
         	//Determinar la humedad diviendo la llegada de los bit mas significativos
         	switch (humedad){
@@ -307,13 +308,25 @@ void TareaDHT(void *P){
             sprintf(form1.Datos_Sensor,"%s",datos_sensor);
             form1.Humedad3 = auxi3/10;
             form1.Temperatura3 = auxi4/10;
+            ESP_LOGI("Sensor_AM2301","humedad es: %s", form1.Humedad1);
+            ESP_LOGI("Sensor_AM2301","Temperatura es: %s", form1.Temperatura1);
             ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3,form1.Temperatura3);
 
 
-  //          ESP_LOGI("Sensor_AM2301","Empezare a flashear");
-            set_form_flash_init(form1);
-            get_form_flash(&form2);
+  //        ESP_LOGI("Sensor_AM2301","Empezare a flashear");
+         /*   set_form_flash_init(form1);
+            get_form_flash(&form2);*/
             sirve = 0;
+
+            prom_hum += auxi3;
+            prom_temp += auxi4;
+            vuelta_temp++;
+            ESP_LOGI("PRUEBA","La humedad es %d",prom_hum);
+            ESP_LOGI("PRUEBA","La temperatura es %d",prom_temp);
+            ESP_LOGI("PRUEBA","La vuelta es %d",vuelta_temp);
+
+
+
 
         	//xQueueSend(Cola_sensor,&datos_sensor,0/portTICK_PERIOD_MS);
         }
@@ -322,11 +335,17 @@ void TareaDHT(void *P){
             sirve = 1;
             xEventGroupSetBits(event_group, BEGIN_TASK1);
         }
+        if (sirve == 0 && vuelta_temp == 16){
+        	vuelta_temp = 0;
+        	form1.Prom_hum = prom_hum/160;
+        	form1.Prom_temp = prom_temp/160;
+        	ESP_LOGI("PRUEBA","La humedad promedio es %f",form1.Prom_hum);
+        	ESP_LOGI("PRUEBA","La temperatura promedio es %f",form1.Prom_temp);
 
-        if (sirve == 0){
+
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
     		xEventGroupSetBits(event_group, BEGIN_TASK3);
         }
-
+        }
     }
 }

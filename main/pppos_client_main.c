@@ -392,7 +392,7 @@ void app_main(void)
 	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 4, NULL,0);
 
 
-	 xEventGroupSetBits(event_group, BEGIN_TASK3);
+	 xEventGroupSetBits(event_group, BEGIN_TASK1);
 
 
 }

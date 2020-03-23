@@ -66,14 +66,14 @@ extern const int BEGIN_TASK3;
 
 static const char *TAG1 = "uart_echo_example";
 
-//La siguiente funcion organiza los datos de una oracion GGA del GPS
-//Fue comentada porque no es necesaria para lo que se necesita mostrar
-//Si se piensa usar de debe quitar void y definir la variable a retornar
+
 /*
 static void GGA_parsing(char* GNGGA_data, gps_data_t GPS_data )
 {
 
-	//Esta funcion ordena los datos GGA en el struct GPS_data usando de intemedio gga_data
+	//La siguiente funcion organiza los datos de una oracion GGA del GPS
+	//Fue comentada porque no es necesaria para lo que se necesita mostrar
+	//Si se piensa usar de debe quitar void y definir la variable a retornar
 
 	gga_data_t gga_data;
 	uint8_t flags1[14] = {0};
@@ -833,7 +833,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			ESP_LOGI(TAG1,"GNVTG es: %s\r\n",NMEA_data.NMEA_GNVTG);*/
 
 
-    	        		  //Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
+    	        		//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
     	        		//	GPS_parsing(NMEA_data.NMEA_GNGGA, gps_data);
 
     	        			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);

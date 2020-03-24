@@ -643,12 +643,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     // Se ignoraron ya que puede ponerse directamente en la funcion
 /*  char *com = {"AT\r\n"};
     int len2 =  4;
-
-
     char *com2 = "AT+GPS=1\r\n";
     int len4 = 10;
-
-
     char *com3 = "AT+GPSRD=1\r\n";
     int len6 = 12;*/
 
@@ -659,9 +655,28 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     gps_data.ronda_error = 0;
     gps_data.error_gps = 0;
 
+    uint8_t led_gps = 0;
+
     while (1) {
 
     	xEventGroupWaitBits(event_group,BEGIN_TASK3,false,true,portMAX_DELAY);
+
+    	//El led titila 3 veces para saber que entro en esta etapa
+    	if (led_gps == 0){
+            gpio_set_level(GPIO_NUM_27, 1);
+            vTaskDelay(167 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 0);
+            vTaskDelay(167 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 1);
+            vTaskDelay(167 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 0);
+            vTaskDelay(167 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 1);
+            vTaskDelay(167 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 0);
+            vTaskDelay(167 / portTICK_PERIOD_MS);
+            led_gps = 1;
+    	}
 
     	if (parar_RTC1 == 1){
     		parar_RTC1 = 0;
@@ -749,6 +764,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
      	        	    		gps_data.ronda_error = 0;
      	        	    		gps_data.error_gps = 1;
      	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+     	        	    		led_gps = 0;
      	        	    		xEventGroupClearBits(event_group, BEGIN_TASK3);
      	        	    		xEventGroupSetBits(event_group, BEGIN_TASK2);
 
@@ -861,6 +877,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			    prom_lon = 0;
     	        			    auxi1_echo = 0;
     	        			    parar_RTC1 = (uint8_t *) 1;
+    	        			    led_gps = 0;
     	        			    //Para detener el envio de datos del GPS se manda lo siguiente
     	        			    len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
     	        			    xEventGroupClearBits(event_group, BEGIN_TASK3);
@@ -890,6 +907,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
     			gps_data.ronda_error = 0;
     			gps_data.error_gps = 1;
+    			led_gps = 0;
     			ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
     			xEventGroupClearBits(event_group, BEGIN_TASK3);
     			xEventGroupSetBits(event_group, BEGIN_TASK2);

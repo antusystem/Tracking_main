@@ -226,7 +226,7 @@ void TareaDHT(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
-    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0;
+    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0, led_temp = 0;
     uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
     int auxi3 = 0, auxi4 = 0;
@@ -241,6 +241,18 @@ void TareaDHT(void *P){
 
     	xEventGroupWaitBits(event_group,BEGIN_TASK1,true,true,portMAX_DELAY);
 
+    	//Prendo el led 2 veces en un segundo para saber en que etapa entre
+    	if (led_temp == 0){
+            gpio_set_level(GPIO_NUM_27, 1);
+            vTaskDelay(250 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 0);
+            vTaskDelay(250 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 1);
+            vTaskDelay(250 / portTICK_PERIOD_MS);
+            gpio_set_level(GPIO_NUM_27, 0);
+            vTaskDelay(250 / portTICK_PERIOD_MS);
+            led_temp = 1;
+    	}
     	sirve = 0;
     	for (int j1 = 0; j1 < 16; j1++ ){
     //	ESP_LOGI("PRUEBA","Esperare 3 segundos");
@@ -338,6 +350,7 @@ void TareaDHT(void *P){
             if (form1.vuelta_error >= 10){
             	form1.vuelta_error = 0;
             	form1.error_temp = 1;
+            	led_temp = 0;
             	xEventGroupClearBits(event_group, BEGIN_TASK1);
             	xEventGroupSetBits(event_group, BEGIN_TASK3);
             	break;
@@ -350,7 +363,7 @@ void TareaDHT(void *P){
         	form1.Prom_temp = prom_temp/16;
         	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
         	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);
-
+        	led_temp = 0;
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
     		xEventGroupSetBits(event_group, BEGIN_TASK3);
     		break;

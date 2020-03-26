@@ -47,7 +47,8 @@ uint16_t posicion_echo[13] = {0};
 float prom_lon = 0;
 float prom_lat = 0;
 
-//Para saber si hay errores con la conexion GPS
+//Para saber si es la primera vez que mando AT + GPS = 1
+uint8_t primera_vuelta = 0;
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
@@ -67,188 +68,6 @@ extern const int BEGIN_TASK3;
 
 
 static const char *TAG1 = "uart_echo_example";
-
-
-/*
-static void GGA_parsing(char* GNGGA_data, gps_data_t GPS_data )
-{
-
-	//La siguiente funcion organiza los datos de una oracion GGA del GPS
-	//Fue comentada porque no es necesaria para lo que se necesita mostrar
-	//Si se piensa usar de debe quitar void y definir la variable a retornar
-
-	gga_data_t gga_data;
-	uint8_t flags1[14] = {0};
-	int k = strlen(GNGGA_data);
-	int k4 = 0;
-	char k2[1] = ",";
-	int k9 = 0;
-
-	// Se identifica la posicion de las comas para luego guardar por partes lo datos
-	for (int k1 = 0; k1 <= k; k1++ ){
-		//ESP_LOGI(TAG2,"Entre al ciclo, k1 es: %d \r\n  k es: %d\r\n y k2 es: %s \r\n y GNGGAdata[k1] es: %c",k1,k,k2,GNGGA_data[k1]);
-		if (GNGGA_data[k1] == k2[0]){
-			flags1[k4] = k1;
-		//	ESP_LOGI(TAG2,"La coma esta en: %d \r\n", flags1[k4]);
-			k4++;
-		}
-	}
-
-	//Guardar datos Time UTC
-
-	k4 = 0;
-	for (int k1 = flags1[0]+1; k1 < (flags1[1]); k1++){
-		gga_data.time_UTC[k4] = GNGGA_data[k1];
-		k4++;
-
-	}
-	gga_data.time_UTC[k4] = 0x00;
-	//Se debe anadir 0x00 para que tenga fin el string
-
-//	ESP_LOGI(TAG2,"1- La hora UTC es: %s \r\n", gga_data.time_UTC);
-
-	//Guardar datos de latitud
-
-	k4 = 0;
-	for (int k1 = flags1[1]+1; k1 < (flags1[2]); k1++){
-		gga_data.latitude[k4] = GNGGA_data[k1];
-		k4++;
-	}
-	gga_data.latitude[k4] = 0x00;
-
-
-	ESP_LOGI(TAG2,"1- La latitud en grados y minutos es: %s \r\n", gga_data.latitude);
-
-	//ordenar los datos para que sean float
-	k9 = strlen(gga_data.latitude);
-	gga_data.latitude_min[8] = 0x00;
-	gga_data.latitude_min[7] = gga_data.latitude[k9];
-	gga_data.latitude_min[6] = gga_data.latitude[k9-1];
-	gga_data.latitude_min[5] = gga_data.latitude[k9-2];
-	gga_data.latitude_min[4] = gga_data.latitude[k9-3];
-	gga_data.latitude_min[3] = gga_data.latitude[k9-4];
-	gga_data.latitude_min[2] = gga_data.latitude[k9-5];
-	gga_data.latitude_min[1] = gga_data.latitude[k9-6];
-	gga_data.latitude_min[0] = gga_data.latitude[k9-7];
-
-//	ESP_LOGI(TAG2,"1- La latitud min es: %s \r\n", gga_data.latitude_min);
-
-	gga_data.latitude_min_f = atof(gga_data.latitude_min);
-//	ESP_LOGI(TAG2, "latitude min f es: %f",gga_data.latitude_min_f);
-
-	gga_data.latitude_deg_f = (atof(gga_data.latitude) - atof(gga_data.latitude_min))/100;
-//	ESP_LOGI(TAG2, "latitude deg f es: %f",gga_data.latitude_deg_f);
-
-	sprintf(gga_data.latitude_deg, "%f",gga_data.latitude_deg_f);
-
-//	ESP_LOGI(TAG2,"1- La latitud deg en grados es: %s \r\n", gga_data.latitude_deg);
-
-	float lat1 = gga_data.latitude_deg_f + gga_data.latitude_min_f/60;
-
-	//sprintf(gga_data.latitude,"%f",lat1);
-
-
-	gga_data.latitude_dir[0] = GNGGA_data[flags1[3]-1];
-	gga_data.latitude_dir[1] = 0x00;
-
-
-	ESP_LOGI(TAG2,"1- La direccion de la latitud es: %s \r\n", gga_data.latitude_dir);
-
-	k4 = 0;
-	for (int k1 = flags1[3]+1; k1 < (flags1[4]); k1++){
-		gga_data.longitude[k4] = GNGGA_data[k1];
-		k4++;
-	}
-	gga_data.longitude[k4] = 0x00;
-
-	ESP_LOGI(TAG2,"1- La longitud es: %s \r\n", gga_data.longitude);
-
-	k9 = strlen(gga_data.longitude);
-	gga_data.longitude_min[8] = 0x00;
-	gga_data.longitude_min[7] = gga_data.longitude[k9];
-	gga_data.longitude_min[6] = gga_data.longitude[k9-1];
-	gga_data.longitude_min[5] = gga_data.longitude[k9-2];
-	gga_data.longitude_min[4] = gga_data.longitude[k9-3];
-	gga_data.longitude_min[3] = gga_data.longitude[k9-4];
-	gga_data.longitude_min[2] = gga_data.longitude[k9-5];
-	gga_data.longitude_min[1] = gga_data.longitude[k9-6];
-	gga_data.longitude_min[0] = gga_data.longitude[k9-7];
-
-//	ESP_LOGI(TAG2,"1- La longitud min es: %s \r\n", gga_data.longitude_min);
-	gga_data.longitude_min_f = atof(gga_data.longitude_min);
-	gga_data.longitude_deg_f = (atof(gga_data.longitude) - atof(gga_data.longitude_min))/100;
-
-//	ESP_LOGI(TAG2,"1- La longitud degf es: %f \r\n", gga_data.longitude_deg_f);
-	sprintf(gga_data.longitude_deg, "%f",gga_data.longitude_deg_f);
-
-	float lat2 = gga_data.longitude_deg_f + gga_data.longitude_min_f/60;
-
-	//sprintf(gga_data.longitude,"%f",lat1);
-
-	gga_data.longitude_dir[0] = GNGGA_data[flags1[5]-1];
-	gga_data.longitude_dir[1] = 0x00;
-
-	ESP_LOGI(TAG2,"1- La direccion de la longitud es: %s \r\n", gga_data.longitude_dir);
-
-
-	//Guardar el fix data
-	gga_data.fix[0] = GNGGA_data[flags1[6]-1];
-	gga_data.fix[1] = 0x00;
-
-	ESP_LOGI(TAG2,"El fix es: %s \r\n", gga_data.fix);
-
-	//Guadar los satelites en uso
-	k4 = 0;
-	for (int k1 = flags1[6]+1; k1 < (flags1[7]); k1++){
-		gga_data.sats_in_use[k4] = GNGGA_data[k1];
-		k4++;
-	}
-	gga_data.sats_in_use[k4] = 0x00;
-
-	ESP_LOGI(TAG2,"Sat in use es: %s \r\n", gga_data.sats_in_use);
-
-	//Guardar horizontal dilution position
-	k4 = 0;
-	for (int k1 = flags1[7]+1;  k1 < (flags1[8]); k1++){
-		gga_data.dop_h[k4] = GNGGA_data[k1];
-		k4++;
-	}
-	gga_data.dop_h[k4] = 0x00;
-
-	ESP_LOGI(TAG2,"El doph es: %s \r\n", gga_data.dop_h);
-
-	//Guardar la altitud
-	k4 = 0;
-	for (int k1 = flags1[8]+1; k1 < (flags1[9]); k1++){
-		gga_data.altitude[k4] = GNGGA_data[k1];
-		k4++;
-	}
-	gga_data.altitude[k4] = 0x00;
-
-	ESP_LOGI(TAG2,"Altitud es: %s \r\n", gga_data.altitude);
-
-
-	//Usando los auxiliares lat1 y lat2 se guarda la latitud y longitud con su direccion en la variable gps_data
-	GPS_data.latitude = lat1;
-	if(gga_data.latitude_dir[0] == 'N'){
-		sprintf(GPS_data.latitude_direct,"Norte");
-	}else{
-		sprintf(GPS_data.latitude_direct,"Sur");
-	}
-	if(gga_data.longitude_dir[0] == 'E'){
-		sprintf(GPS_data.longitude_direct,"Este");
-	}
-	if(gga_data.longitude_dir[0] == 'W'){
-		sprintf(GPS_data.longitude_direct,"Oeste");
-	}
-
-	ESP_LOGI(TAG2,"La latitud en grados es: %f con direccion: %s \r\n", GPS_data.latitude, GPS_data.latitude_direct);
-	GPS_data.longitude = lat2;
-	ESP_LOGI(TAG2,"La longitud en grados es: %f con direccion: %s \r\n", GPS_data.longitude, GPS_data.longitude_direct);
-
-}
-
-*/
 
 static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 
@@ -375,12 +194,15 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 			ESP_LOGI(TAG2,"La ronda es: %d\r\n",ronda);
 
 			prom_lat +=  GPS_data->latitude[ronda];
-			ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lat);
 
-			if (ronda == 10){
+			ESP_LOGI(TAG2,"El pre -prom lat en DEG es: %f\r\n",prom_lat);
+
+			GPS_data->latitude_prom = prom_lat/10;
+			ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
+		/*	if (ronda == 10){
 				GPS_data->latitude_prom = prom_lat/10;
 				ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
-			}
+			}*/
 
 		break;
 		case 3:
@@ -429,11 +251,13 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 
 			prom_lon +=  GPS_data->longitude[ronda];
 			ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lon);
+			GPS_data->longitude_prom = prom_lon/10;
+			ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
 
-			if (ronda == 10){
+		/*	if (ronda == 10){
 				GPS_data->longitude_prom = prom_lon/10;
 				ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
-			}
+			}*/
 
 
 
@@ -603,7 +427,6 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 }
 
 
-
   void echo_task(void *arg)
 {
 	//Se inicia la tarea configurando los Uart 0 y Uart 2
@@ -635,8 +458,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     uint8_t tx_buf[BUF_SIZE];
 
     //Esta variable sirve para indicar cuando pedir que no siga enviando los datos GPS
-    uint8_t * parar_RTC1 = (uint8_t * ) malloc(10);
-    parar_RTC1 = 0;
+    uint8_t * parar_RD1 = (uint8_t * ) malloc(10);
+    parar_RD1 = 0;
 
 
     // Se definen los comandos AT que seran enviados con su longitud y un auxiliar
@@ -678,8 +501,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
             led_gps = 1;
     	}
 
-    	if (parar_RTC1 == 1){
-    		parar_RTC1 = 0;
+    	if (parar_RD1 == 1){
+    		parar_RD1 = 0;
     	}
 
     	//Se debe limpiar tx_buf para borrar lo de la ronda anterior
@@ -688,7 +511,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
     	// Empezara escaladamente a mandar lo comandos AT necesarios en cada vuelta
 
-    	if (parar_RTC1 == 0){
+    	if (parar_RD1 == 0){
     	switch (auxi1_echo){
     	case 0:
     		//En la primera vuelta manda AT para ver si la comunicacion ya se puede establecer
@@ -747,7 +570,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y "ATGPSRD"
 
 
-    	        if (parar_RTC1 == 0){
+    	        if (parar_RD1 == 0){
 
     	        	switch (auxi1_echo){
     	        	case 0:
@@ -876,7 +699,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			    prom_lat = 0;
     	        			    prom_lon = 0;
     	        			    auxi1_echo = 0;
-    	        			    parar_RTC1 = (uint8_t *) 1;
+    	        			    parar_RD1 = (uint8_t *) 1;
     	        			    led_gps = 0;
     	        			    //Para detener el envio de datos del GPS se manda lo siguiente
     	        			    len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
@@ -887,8 +710,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        		}
     	        	}
 
-    	        	if (parar_RTC1 == 1){
-    	        		 ESP_LOGI(TAG1, "4- Para RTC es true \r\n");
+    	        	if (parar_RD1 == 1){
+    	        		 ESP_LOGI(TAG1, "4- Para RD es true \r\n");
     	        		 vTaskDelay( pdMS_TO_TICKS(3000) );
     	        	}
 

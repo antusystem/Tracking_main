@@ -230,7 +230,7 @@ void TareaDHT(void *P){
     uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
     int auxi3 = 0, auxi4 = 0;
-    float auxi3_f = 0, auxi4_f = 0, prom_temp = 0, prom_hum = 0;
+    float prom_temp = 0, prom_hum = 0;
 
     //vuelta error indica cuantas vueltas a dado con error, si llega a 10 salta al GPS
     // y con error temp se verifica cuando se envia el mensaje si se logro medir la temperatura
@@ -304,7 +304,6 @@ void TareaDHT(void *P){
         	sprintf(auxc2,"%d",auxi4);
  //       	ESP_LOGI("Sensor_AM2301","auxc2: %s", auxc2);
 
-
         	datos_sensor[20] = auxc1[0];
         	datos_sensor[21] = auxc1[1];
         	datos_sensor[23] = auxc1[2];
@@ -320,11 +319,9 @@ void TareaDHT(void *P){
             form1.Humedad2 = auxi3;
             form1.Temperatura2 = auxi4;
             sprintf(form1.Datos_Sensor,"%s",datos_sensor);
-            auxi3_f = auxi3;
-            auxi4_f = auxi4;
-            form1.Humedad3 = auxi3_f/10;
-            form1.Temperatura3 = auxi4_f/10;
-            ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3,form1.Temperatura3);
+            form1.Humedad3[j1] = (float) auxi3/10;
+            form1.Temperatura3[j1] = (float) auxi4/10;
+            ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3[j1],form1.Temperatura3[j1]);
 
 
   //        ESP_LOGI("Sensor_AM2301","Empezare a flashear");
@@ -333,10 +330,25 @@ void TareaDHT(void *P){
             sirve = 0;
             form1.vuelta_error = 0;
 
-            prom_hum += form1.Humedad3;
-            prom_temp += form1.Temperatura3;
+         //   prom_hum += form1.Humedad3[j1];
+         //   prom_temp += form1.Temperatura3[j1];
             vuelta_temp++;
             ESP_LOGI("Sensor_AM2301","La vuelta es: %d", vuelta_temp);
+
+            for (int i = 0; i < 16; i++ ){
+            	prom_hum += form1.Humedad3[i];
+
+            	prom_temp += form1.Temperatura3[i];
+
+            }
+            ESP_LOGI("Sensor_AM2301","Prom hum es: %f", prom_hum);
+            ESP_LOGI("Sensor_AM2301","Prom temp es: %f", prom_temp);
+            form1.Prom_hum = prom_hum/16;
+            form1.Prom_temp = prom_temp/16;
+            prom_hum =  0.0;
+            prom_temp = 0.0;
+        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
+        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);
         }
         else{
             ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
@@ -359,10 +371,10 @@ void TareaDHT(void *P){
 
         if (sirve == 0 && vuelta_temp >=16){
         	vuelta_temp = 0;
-        	form1.Prom_hum = prom_hum/16;
+    /*    	form1.Prom_hum = prom_hum/16;
         	form1.Prom_temp = prom_temp/16;
         	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
-        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);
+        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);*/
         	led_temp = 0;
     		xEventGroupClearBits(event_group, BEGIN_TASK1);
     		xEventGroupSetBits(event_group, BEGIN_TASK3);

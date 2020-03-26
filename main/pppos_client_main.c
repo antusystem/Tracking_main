@@ -35,8 +35,7 @@
 // Cosas de la temperatura
 
 #define Pila 1024
-#define tamCola 1
-#define tamMSN 53
+
 
 //Para el gps
 

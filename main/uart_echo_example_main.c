@@ -253,7 +253,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 			ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lon);
 			GPS_data->longitude_prom = prom_lon/10;
 			ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
-
+			//prueba
 		/*	if (ronda == 10){
 				GPS_data->longitude_prom = prom_lon/10;
 				ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);

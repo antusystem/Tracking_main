@@ -22,6 +22,8 @@
 #include "sim800.h"
 #include "bg96.h"
 #include "nvs_flash.h"
+#include "freertos/queue.h"
+
 
 
 
@@ -34,7 +36,7 @@
 
 // Cosas de la temperatura
 
-#define Pila 1024
+//#define Pila 1024
 
 
 //Para el gps
@@ -42,6 +44,10 @@
 #define BUF_SIZE (1024)
 #include "NMEA_setting.h"
 
+
+//Para las colas
+
+QueueHandle_t xQueue;
 
 
 
@@ -62,8 +68,14 @@ const int GOT_DATA_BIT = BIT2;
 
   const int BEGIN_TASK3 = BIT5;
 
+  const int SYNC_BIT_TASK1 = BIT6;
+
+  const int SYNC_BIT_TASK2 = BIT7;
+
 //Para conocer el estado de la puerta
-uint8_t puerta = 0;
+uint8_t puerta_a = 0;
+uint8_t puerta_b = 0;
+uint8_t puerta_c = 0;
 
 #if CONFIG_EXAMPLE_SEND_MSG
 /**
@@ -254,7 +266,11 @@ void Mandar_mensaje(void *P)
 	printf("Entre en mandar mensaje \r\n");
 		for(;;){
 
-		xEventGroupWaitBits(event_group,BEGIN_TASK2,true,true,portMAX_DELAY);
+		xEventGroupSync(event_group,BEGIN_TASK1,0xC0,portMAX_DELAY);
+		xEventGroupClearBits(event_group, BEGIN_TASK3);
+	    xEventGroupClearBits(event_group, SYNC_BIT_TASK1);
+	    xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
+		//xEventGroupWaitBits(event_group,BEGIN_TASK2,true,true,portMAX_DELAY);
 
 		//El led prendera 1 segundo al entrar en esta etapa
     	if (led_gsm == 0){
@@ -342,10 +358,8 @@ void Mandar_mensaje(void *P)
     /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
      * */
-
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
     if (form1.error_temp == 0){
-
 		#if CONFIG_EXAMPLE_SEND_MSG
     	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
     	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
@@ -361,77 +375,83 @@ void Mandar_mensaje(void *P)
 		#endif
     }
 
-    if (gps_data.error_gps == 0){
-
-    	if (gps_data.year == 20){
-
-    		switch (puerta){
-    		case 0:
+    switch (puerta_b){
+    case 0:
+    // Verifico si no hubo error al conectarse a al modulo GPS
+        if (gps_data.error_gps == 0){
+        	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
+        	if (gps_data.year == 20){
 				#if CONFIG_EXAMPLE_SEND_MSG
-    			sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
-    			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    			ESP_LOGI(TAG, "Send send message [%s] ok", message);
+        		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
+        		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
 				#endif
-    		break;
-    		case 1:
+
+				#if CONFIG_EXAMPLE_SEND_MSG
+        		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
+        		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+				#endif
+        	} else{
+			#if CONFIG_EXAMPLE_SEND_MSG
+			sprintf(message,"No se logro conectar a la red GPS.");
+			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+			ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			#endif
+        	}
+        } else{
+  			gps_data.error_gps = 0;
+    		#if CONFIG_EXAMPLE_SEND_MSG
+    		sprintf(message,"No se logro conectar con el modulo GPS.");
+    		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			#endif
+        }
+    break;
+    case 1:
+    	// Verifico si no hubo error al conectarse a al modulo GPS
+    	if (gps_data.error_gps == 0){
+    	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
+    		if (gps_data.year == 20){
 				#if CONFIG_EXAMPLE_SEND_MSG
     			sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
     			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     			ESP_LOGI(TAG, "Send send message [%s] ok", message);
 				#endif
-    			puerta = 0;
-    		break;
-    		}
-
-			#if CONFIG_EXAMPLE_SEND_MSG
-    		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
-    		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-			#endif
+    			if (puerta_a == 0){
+    				puerta_b = 0;
+    				puerta_c = 0;
+    			}
+ 				#if CONFIG_EXAMPLE_SEND_MSG
+    	        sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
+    	        ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    	        ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    			#endif
+    	    } else{
+				#if CONFIG_EXAMPLE_SEND_MSG
+    	    	sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
+    	    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+    	    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
+				#endif
+    			if (puerta_a == 0){
+    				puerta_b = 0;
+    				puerta_c = 0;
+    			}
+    	    }
     	} else{
-
-    		switch (puerta){
-    			case 0:
-					#if CONFIG_EXAMPLE_SEND_MSG
-    				sprintf(message,"No se logro conectar a la red GPS.");
-    				ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    				ESP_LOGI(TAG, "Send send message [%s] ok", message);
-					#endif
-    			break;
-    			case 1:
-					#if CONFIG_EXAMPLE_SEND_MSG
-    				sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
-    				ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    				ESP_LOGI(TAG, "Send send message [%s] ok", message);
-					#endif
-    				puerta = 0;
-    			break;
-    		}
+			gps_data.error_gps = 0;
+			#if CONFIG_EXAMPLE_SEND_MSG
+			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
+			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
+			ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			#endif
+			if (puerta_a == 0){
+				puerta_b = 0;
+				puerta_c = 0;
+			}
     	}
-    } else {
-    	switch (puerta) {
-    		case 0:
-    			gps_data.error_gps = 0;
-    			#if CONFIG_EXAMPLE_SEND_MSG
-    			sprintf(message,"No se logro conectar con el modulo GPS.");
-    			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    			ESP_LOGI(TAG, "Send send message [%s] ok", message);
-				#endif
-    		break;
-    		case 1:
-    			gps_data.error_gps = 0;
-    			#if CONFIG_EXAMPLE_SEND_MSG
-    			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
-    			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    			ESP_LOGI(TAG, "Send send message [%s] ok", message);
-				#endif
-    			puerta = 0;
-    		break;
-    	}
-
-
+    break;
     }
-
 
 
 
@@ -442,10 +462,10 @@ void Mandar_mensaje(void *P)
     ESP_ERROR_CHECK(dte->deinit(dte));
     ESP_LOGI(TAG, "Power down2");
     vTaskDelay(2000 / portTICK_PERIOD_MS);
-    xEventGroupClearBits(event_group, BEGIN_TASK2);
-    xEventGroupSetBits(event_group, BEGIN_TASK1);
+//    xEventGroupClearBits(event_group, BEGIN_TASK2);
+//    xEventGroupSetBits(event_group, BEGIN_TASK1);
     vuelta_men = 1;
-
+    led_gsm = 0;
 	}
 }
 
@@ -476,18 +496,38 @@ void app_main(void)
 
 	event_group = xEventGroupCreate();
 
-	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", Pila*3, NULL, 8, NULL,0);
+	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 8, NULL,0);
 	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*6, NULL, 6, NULL,0);
 	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 4, NULL,0);
 
-	xEventGroupSetBits(event_group, BEGIN_TASK1);
+	xEventGroupSetBits(event_group, BEGIN_TASK2);
 
 	//Espera a que la puerta se abra para dar la senal
 	while(1){
-
+		//Si el nivel de la puerta es 1 entonces uso dos variables para controlar este nivel
+		//puerta_a sirve para saber si la puerta esta abierta o cerrada en todo momento
+		//puerta_b se usa para tener una referencia de cuando la puerta se abrio y no repetir
+		//el uso de las tareas
 		if (gpio_get_level(GPIO_NUM_14) == 1){
-			puerta = 1;
 			vTaskDelay(200 / portTICK_PERIOD_MS);
+			puerta_a = 1;
+			if (puerta_b == 0){
+				puerta_b = 1;
+			}
+		}
+		if (gpio_get_level(GPIO_NUM_14) == 0){
+			vTaskDelay(200 / portTICK_PERIOD_MS);
+			puerta_a = 0;
+		}
+		//Ahora que ya se si la puerta se abrio o no, falta activar la tarea
+		//puerta_c sirve para activar inmediatamente la funcion de mandar mensaje pero solo una vez
+		//luego debe de seguir el ciclo normal del programa cambiando unicamente
+		//lo que dicen los mensajes.
+
+		if (puerta_b == 1 && puerta_c == 0 ){
+			puerta_c = 1;
+			xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
+			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
 		}
 		vTaskDelay(200 / portTICK_PERIOD_MS);
 	}

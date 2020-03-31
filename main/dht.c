@@ -19,11 +19,16 @@
 
 extern EventGroupHandle_t event_group;
 
+extern QueueHandle_t xQueue;
+
 extern const int BEGIN_TASK1;
 
+extern const int SYNC_BIT_TASK1;
+/*
 extern const int BEGIN_TASK2;
 
-extern const int BEGIN_TASK3;
+extern const int BEGIN_TASK3;*/
+
 
 
 const char *nvs_tag = "NVS";
@@ -226,11 +231,14 @@ void TareaDHT(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
-    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0, led_temp = 0;
+    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0;
     uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
     int auxi3 = 0, auxi4 = 0;
     float prom_temp = 0, prom_hum = 0;
+
+    //Para saber la posicion en que estoy dentro del arreglo de promedios de temp y hum
+    form1.pos_temp = 0;
 
     //vuelta error indica cuantas vueltas a dado con error, si llega a 10 salta al GPS
     // y con error temp se verifica cuando se envia el mensaje si se logro medir la temperatura
@@ -239,20 +247,9 @@ void TareaDHT(void *P){
 
     for(;;){
 
-    	xEventGroupWaitBits(event_group,BEGIN_TASK1,true,true,portMAX_DELAY);
+    	xEventGroupWaitBits(event_group,BEGIN_TASK1,pdFALSE,true,portMAX_DELAY);
 
     	//Prendo el led 2 veces en un segundo para saber en que etapa entre
-    	if (led_temp == 0){
-            gpio_set_level(GPIO_NUM_27, 1);
-            vTaskDelay(250 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 0);
-            vTaskDelay(250 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 1);
-            vTaskDelay(250 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 0);
-            vTaskDelay(250 / portTICK_PERIOD_MS);
-            led_temp = 1;
-    	}
     	sirve = 0;
     	for (int j1 = 0; j1 < 16; j1++ ){
     //	ESP_LOGI("PRUEBA","Esperare 3 segundos");
@@ -343,28 +340,27 @@ void TareaDHT(void *P){
             }
             ESP_LOGI("Sensor_AM2301","Prom hum es: %f", prom_hum);
             ESP_LOGI("Sensor_AM2301","Prom temp es: %f", prom_temp);
-            form1.Prom_hum = prom_hum/16;
-            form1.Prom_temp = prom_temp/16;
+            form1.Prom_hum[form1.pos_temp] = prom_hum/16;
+            form1.Prom_temp[form1.pos_temp] = prom_temp/16;
             prom_hum =  0.0;
             prom_temp = 0.0;
-        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
-        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);
+        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum[form1.pos_temp]);
+        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp[form1.pos_temp]);
+        	form1.pos_temp++;
         }
         else{
             ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
             sirve = 1;
             form1.vuelta_error++;
          //   if (form1.vuelta_error < 10){
-            	xEventGroupSetBits(event_group, BEGIN_TASK1);
+          //	xEventGroupSetBits(event_group, BEGIN_TASK1);
           //  }
             //Aqui verifico si ya tuve 10 errores seguidos midiendo la temperatura,
             //al 10mo sigue a la siguiente tarea y deja el flag error temp en 1
             if (form1.vuelta_error >= 10){
             	form1.vuelta_error = 0;
             	form1.error_temp = 1;
-            	led_temp = 0;
-            	xEventGroupClearBits(event_group, BEGIN_TASK1);
-            	xEventGroupSetBits(event_group, BEGIN_TASK3);
+            	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
             	break;
             }
         }
@@ -375,9 +371,10 @@ void TareaDHT(void *P){
         	form1.Prom_temp = prom_temp/16;
         	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
         	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);*/
-        	led_temp = 0;
-    		xEventGroupClearBits(event_group, BEGIN_TASK1);
-    		xEventGroupSetBits(event_group, BEGIN_TASK3);
+        	xQueueReceive(xQueue,&,100/portTICK_RATE_MS);
+    	//	xEventGroupClearBits(event_group, BEGIN_TASK1);
+    	//	xEventGroupSetBits(event_group, BEGIN_TASK3);
+        	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
     		break;
         }
         }

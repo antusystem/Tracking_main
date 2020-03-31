@@ -15,6 +15,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
+
 //Defino el tamano del buffer de recepcion de datos GPS
 //Con el modulo A9G los buses llegan por segundo y tienden a ser un string
 //de aproximadament 282 caracteres
@@ -60,12 +61,11 @@ int len = 0;
 //Para usar gestion de eventos
 extern EventGroupHandle_t event_group;
 
-extern const int BEGIN_TASK1;
+
 
 extern const int BEGIN_TASK2;
 
-extern const int BEGIN_TASK3;
-
+extern const int SYNC_BIT_TASK2;
 
 static const char *TAG1 = "uart_echo_example";
 
@@ -253,7 +253,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 			ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lon);
 			GPS_data->longitude_prom = prom_lon/10;
 			ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
-			//prueba
+
 		/*	if (ronda == 10){
 				GPS_data->longitude_prom = prom_lon/10;
 				ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
@@ -458,7 +458,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     uint8_t tx_buf[BUF_SIZE];
 
     //Esta variable sirve para indicar cuando pedir que no siga enviando los datos GPS
-    uint8_t * parar_RD1 = (uint8_t * ) malloc(10);
+    uint8_t * parar_RD1 =  malloc(10);
     parar_RD1 = 0;
 
 
@@ -478,28 +478,11 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     gps_data.ronda_error = 0;
     gps_data.error_gps = 0;
 
-    uint8_t led_gps = 0;
+
 
     while (1) {
 
-    	xEventGroupWaitBits(event_group,BEGIN_TASK3,false,true,portMAX_DELAY);
-
-    	//El led titila 3 veces para saber que entro en esta etapa
-    	if (led_gps == 0){
-            gpio_set_level(GPIO_NUM_27, 1);
-            vTaskDelay(167 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 0);
-            vTaskDelay(167 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 1);
-            vTaskDelay(167 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 0);
-            vTaskDelay(167 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 1);
-            vTaskDelay(167 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 0);
-            vTaskDelay(167 / portTICK_PERIOD_MS);
-            led_gps = 1;
-    	}
+    	xEventGroupWaitBits(event_group,BEGIN_TASK2,pdFALSE,true,portMAX_DELAY);
 
     	if (parar_RD1 == 1){
     		parar_RD1 = 0;
@@ -520,8 +503,14 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 	    break;
     	case 1:
     		//En la segunda vuelta activa el GPS
-    		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
-    		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
+    		if (primera_vuelta == 0){
+        		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
+        		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
+    		} else {
+    			//Si ya no es la primera vuelta entonces hago len5=2 para que entre en el siguiente if
+    			len5 = 2;
+    			ESP_LOGI(TAG1, "Len5 es 2\r\n");
+    		}
     	break;
     	case 2:
     		//En la tercera vuelta solicita los datos del GPS
@@ -587,26 +576,25 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
      	        	    		gps_data.ronda_error = 0;
      	        	    		gps_data.error_gps = 1;
      	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
-     	        	    		led_gps = 0;
-     	        	    		xEventGroupClearBits(event_group, BEGIN_TASK3);
-     	        	    		xEventGroupSetBits(event_group, BEGIN_TASK2);
-
+     	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
      	        	    	}
      	        	    }
     	        		break;
     	        	case 1:
     	        		if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
-    	        			ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
     	        			auxi1_echo++;
     	        			len5 = 0;
     	        			//Ahora se esperara 40 segundos para que se logre conectar a la red GPS
-    	        			if (auxi2_echo == 0){
-    	        				auxi2_echo = 1;
-        	        			ESP_LOGI(TAG1, "2- Esperare 40 segundos \r\n");
-        	        			vTaskDelay(pdMS_TO_TICKS(40000));
+    	        			if (primera_vuelta == 0){
+    	        				primera_vuelta = 1;
+    	        				ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
+    	        				ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
+    	        				vTaskDelay(pdMS_TO_TICKS(50000));
     	        			}
     	        		} else {
-     	        	    	ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 OK \r\n");
+    	        			if (primera_vuelta == 0){
+    	        				ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 OK \r\n");
+    	        			}
      	        	    }
     	        		break;
     	        		//Este caso causa molestia de vez en cuando y aparte no es necesario
@@ -700,11 +688,9 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			    prom_lon = 0;
     	        			    auxi1_echo = 0;
     	        			    parar_RD1 = (uint8_t *) 1;
-    	        			    led_gps = 0;
     	        			    //Para detener el envio de datos del GPS se manda lo siguiente
     	        			    len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
-    	        			    xEventGroupClearBits(event_group, BEGIN_TASK3);
-    	        			    xEventGroupSetBits(event_group, BEGIN_TASK2);
+    	        			    xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     	        			}
     	        		    break;
     	        		}
@@ -730,11 +716,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
     			gps_data.ronda_error = 0;
     			gps_data.error_gps = 1;
-    			led_gps = 0;
     			ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
-    			xEventGroupClearBits(event_group, BEGIN_TASK3);
-    			xEventGroupSetBits(event_group, BEGIN_TASK2);
-
+    			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     		}
 
     	}

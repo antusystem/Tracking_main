@@ -79,6 +79,8 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 	// Con la variable ronda (que se aumenta cada vez que llega algo al buffer) se lleva el control
 	// de la posicion que se guardara en el arreglo de latitud y longitud. Al llegar a 10 debe parar
 	// de enviar datos
+	ESP_LOGI("PRUEBA","Declarare en RMCparsing");
+	ESP_LOGI("PRUEBA","ronda es %d",ronda);
 	rmc_data_t rmc_data;
 	uint16_t flags2[11] = {0};
 //	int l1 = 0;
@@ -93,9 +95,10 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 	//se agrega coma porque poniendo ',' en strstr no agarraba
 	char* coma = ",";
 	//Para calcular un promedio final de los valores se agrega prom de auxiliar
-
+	ESP_LOGI("PRUEBA","declare  RMCparsing");
 	//Para contar cuantas veces se guardan los datos se aumenta la cantidad de ronda
 	ronda++;
+	ESP_LOGI("PRUEBA","ronda es %d",ronda);
 
 
 //Guardar la posicion de las comas en flags2
@@ -105,14 +108,17 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 	//	ESP_LOGI(TAG2,"flag2 es: %d \r\n",flags2[k1]);
 		GNRMC_data[flags2[k1]] = '-';
 	}
+	ESP_LOGI("PRUEBA","Ya tengo las comas");
 
 	for (int k1 = 0; k1 < 9; k1++){
-
+		ESP_LOGI("PRUEBA","Estoy en el for con k1 %d",k1);
 		switch (k1){
 		case 0:
+			ESP_LOGI("PRUEBA","Caso 0.0");
 	//		l1 = 0;
 			strncpy(rmc_data.time_UTC,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
 	//		l1 = strlen(rmc_data.time_UTC);
+			ESP_LOGI("PRUEBA","Caso 0.1");
 			rmc_data.time_UTC[10] = 0x00;
 	//		ESP_LOGI(TAG2,"El tiempo UTC es: %s\r\n",rmc_data.time_UTC);
 
@@ -377,16 +383,22 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 {
 
 	//Esta funcion identificara que tipo datos (dentro de los soportados) es la oracion y lo organizara
-/*	char GSA[3] = "GSA";
-	char GSV[3] = "GSV";
-	char VTG[3] = "VTG";
-	char GGA[3] = "GGA";*/
+
 	char RMC[3] = "RMC";
+
+	if (data[2] == RMC[0] && data[3] == RMC[1] && data[4] == RMC[2]){
+		ESP_LOGI(TAG2,"Empezara a parsear RMC");
+		GPS_data  = RMC_parsing(data, &GPS_data);
+	}
 
 
 	//Se crean las variables auxiliares para comprobar de que tipo son luego se llama
 	//la funcion que lo ordenara
 
+	/*	char GSA[3] = "GSA";
+		char GSV[3] = "GSV";
+		char VTG[3] = "VTG";
+		char GGA[3] = "GGA";*/
 /*	if (data[2] == GGA[0] && data[3] == GGA[1] && data[4] == GGA[2]){
 
 		ESP_LOGI(TAG2,"Empezara a parsear GGA");
@@ -416,17 +428,14 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
 	}
 */
-	if (data[2] == RMC[0] && data[3] == RMC[1] && data[4] == RMC[2]){
-		ESP_LOGI(TAG2,"Empezara a parsear RMC");
-		GPS_data  = RMC_parsing(data, &GPS_data);
-	}
+
 /*
 	if (GNVTG_data[2] == VTG[0] && GNVTG_data[3] == VTG[1] && GNVTG_data[4] == VTG[2]){
 		ESP_LOGI(TAG2,"Empezara a parsear VTG");
 
 	}
 */
-
+	//Todo lo que esta comentado arriba es por si se piensa implementar para ordenar otras oraciones
 	return GPS_data;
 }
 
@@ -576,6 +585,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			ESP_LOGI(TAG1, "1- Respondio AT OK \r\n");
     	         	        auxi1_echo++;
     	         	        len3 = 0;
+    	         	       gps_data.ronda_error = 0;
     	         	    } else {
      	        	    	ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
      	        	    	gps_data.ronda_error++;
@@ -589,6 +599,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
      	        	    }
     	        		break;
     	        	case 1:
+    	        		gps_data.ronda_error = 0;
     	        		if (primera_vuelta == 0){
     	        			if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
     	        			   auxi1_echo++;
@@ -596,7 +607,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
     	        		       ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
-    	        		       vTaskDelay(pdMS_TO_TICKS(50000));
+    	        		       vTaskDelay(pdMS_TO_TICKS(10000));
     	        			}
     	        		} else {
     	        			if (strncmp(auxc2_echo,auxc1_echo,10) == 0){

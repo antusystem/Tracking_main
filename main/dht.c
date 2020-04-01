@@ -371,7 +371,6 @@ void TareaDHT(void *P){
         	form1.Prom_temp = prom_temp/16;
         	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
         	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);*/
-        	xQueueReceive(xQueue,&,100/portTICK_RATE_MS);
     	//	xEventGroupClearBits(event_group, BEGIN_TASK1);
     	//	xEventGroupSetBits(event_group, BEGIN_TASK3);
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);

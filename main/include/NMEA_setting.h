@@ -31,10 +31,10 @@ typedef struct {
 } NMEA_data_t;
 
 typedef struct {
-    float latitude[10];                                                /*!< Latitude (degrees) */
+    float latitude[45];                                                /*!< Latitude (degrees) */
     float latitude_prom;
     char latitude_direct[20];
-    float longitude[10];                                               /*!< Longitude (degrees) */
+    float longitude[45];                                               /*!< Longitude (degrees) */
     float longitude_prom;
     char longitude_direct[20];
     float altitude;                                                /*!< Altitude (meters) */

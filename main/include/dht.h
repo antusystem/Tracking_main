@@ -2,7 +2,8 @@
 #define __DHT_H__
 #include "stdint.h"
 
-struct form_home{
+
+typedef struct {
 	char Humedad1[6];
 	char Temperatura1[6];
 	uint16_t Humedad2;
@@ -15,10 +16,10 @@ struct form_home{
 	uint8_t vuelta_error;
 	uint8_t error_temp;
 	uint8_t pos_temp;
-};
+} AM2301_data_t;
 
 
-struct form_home form1;
+AM2301_data_t Thum;
 
 
 void TareaDHT(void *P);

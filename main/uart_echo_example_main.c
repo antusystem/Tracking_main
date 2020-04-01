@@ -61,11 +61,13 @@ int len = 0;
 //Para usar gestion de eventos
 extern EventGroupHandle_t event_group;
 
-
-
 extern const int BEGIN_TASK2;
 
 extern const int SYNC_BIT_TASK2;
+
+//Para la cola
+
+extern QueueHandle_t xQueue_gps;
 
 static const char *TAG1 = "uart_echo_example";
 
@@ -532,11 +534,11 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
     	    //Se comprueba si llego algo al uart y se publica que llego
     	    if(len>0){
-    	     	ESP_LOGI(TAG1, "Borrare auxc2");
+    	     //	ESP_LOGI(TAG1, "Borrare auxc2");
     	     	// Borrar lo que tenia antes auxc2
     	     	bzero(auxc2_echo,BUF_SIZE);
     	     	// Mostar que se borro todo
-    	     	ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
+    	    // 	ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
     	     	// Copiar lo que esta en el buffer de recepcion
 
 
@@ -586,7 +588,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			len5 = 0;
     	        			//Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			if (primera_vuelta == 0){
-    	        				primera_vuelta = 1;
+    	        			//	primera_vuelta = 1;
     	        				ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
     	        				ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
     	        				vTaskDelay(pdMS_TO_TICKS(50000));
@@ -680,18 +682,37 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
     	        			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
     	        			gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
-    	        			if (ronda == 10 ){
-    	        			   //Como ya termine de guardar 10 veces los datos reinicio las variables globales
-    	        			    ronda = 0;
-    	        			    len7 = 0;
-    	        			    prom_lat = 0;
-    	        			    prom_lon = 0;
-    	        			    auxi1_echo = 0;
-    	        			    parar_RD1 = (uint8_t *) 1;
-    	        			    //Para detener el envio de datos del GPS se manda lo siguiente
-    	        			    len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
-    	        			    xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+    	        			xQueueOverwrite(xQueue_gps,&gps_data);
+
+    	        			if (primera_vuelta == 0){
+    	        				if (ronda == 10 ){
+    	        					primera_vuelta = 1;
+    	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
+    	        					ronda = 0;
+    	        					len7 = 0;
+    	        					prom_lat = 0;
+    	        					prom_lon = 0;
+    	        					auxi1_echo = 0;
+    	        					parar_RD1 = (uint8_t *) 1;
+    	        					//Para detener el envio de datos del GPS se manda lo siguiente
+    	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+    	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+    	        				}
     	        			}
+
+	        				if (ronda == 40 ){
+	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
+	        					ronda = 0;
+	        					len7 = 0;
+	        					prom_lat = 0;
+	        					prom_lon = 0;
+	        					auxi1_echo = 0;
+	        					parar_RD1 = (uint8_t *) 1;
+	        					//Para detener el envio de datos del GPS se manda lo siguiente
+	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+	        				}
+
     	        		    break;
     	        		}
     	        	}

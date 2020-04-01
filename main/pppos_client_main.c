@@ -47,7 +47,8 @@
 
 //Para las colas
 
-QueueHandle_t xQueue;
+QueueHandle_t xQueue_temp;
+QueueHandle_t xQueue_gps;
 
 
 
@@ -359,15 +360,15 @@ void Mandar_mensaje(void *P)
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
      * */
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
-    if (form1.error_temp == 0){
+    if (Thum.error_temp == 0){
 		#if CONFIG_EXAMPLE_SEND_MSG
-    	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
+    	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",Thum.Humedad1[0],Thum.Humedad1[1],Thum.Humedad1[2],Thum.Temperatura1[0],Thum.Temperatura1[1],Thum.Temperatura1[2]);
     	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     	ESP_LOGI(TAG, "Send send message [%s] ok", message);
 		#endif
     } else {
 
-    	form1.error_temp = 0;
+    	Thum.error_temp = 0;
 		#if CONFIG_EXAMPLE_SEND_MSG
     	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
     	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
@@ -495,6 +496,7 @@ void app_main(void)
 	gpio_set_level(GPIO_NUM_27, 0);
 
 	event_group = xEventGroupCreate();
+	xQueue_temp = xQueueCreate(1, sizeof (gps_data_t));
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 8, NULL,0);
 	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*6, NULL, 6, NULL,0);

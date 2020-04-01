@@ -35,25 +35,25 @@ const char *nvs_tag = "NVS";
 struct form_home *form2;
 
 //Escribir en la memoria flash
-void set_form_flash_init(struct form_home form){
+void set_form_flash_init( AM2301_data_t Thum){
 	esp_err_t err;
 	nvs_handle_t ctrl_flash;
 	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);
 	if (err != ESP_OK) {
 		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 	}else{
-		nvs_set_str(ctrl_flash,"Humedad1",form.Humedad1);
+		nvs_set_str(ctrl_flash,"Humedad1",Thum.Humedad1);
 
-		nvs_set_str(ctrl_flash,"Temperatura1",form.Temperatura1);
+		nvs_set_str(ctrl_flash,"Temperatura1",Thum.Temperatura1);
 
-		ESP_LOGI("NVS_FLASH","Temperatura2 a guardar en flash: %d",form.Temperatura2);
-		nvs_set_u16(ctrl_flash,"Temp2",form.Temperatura2);
+		ESP_LOGI("NVS_FLASH","Temperatura2 a guardar en flash: %d",Thum.Temperatura2);
+		nvs_set_u16(ctrl_flash,"Temp2",Thum.Temperatura2);
 
-		nvs_set_u16(ctrl_flash,"Humedad2",form.Humedad2);
+		nvs_set_u16(ctrl_flash,"Humedad2",Thum.Humedad2);
 
-		ESP_LOGI("NVS_FLASH","Datos_Sensor a guardar en flash: %s",form.Datos_Sensor);
+		ESP_LOGI("NVS_FLASH","Datos_Sensor a guardar en flash: %s",Thum.Datos_Sensor);
 
-		nvs_set_str(ctrl_flash,"Datos_Sensor",form.Datos_Sensor);
+		nvs_set_str(ctrl_flash,"Datos_Sensor",Thum.Datos_Sensor);
 
 		err = nvs_commit(ctrl_flash);
 	}
@@ -62,7 +62,7 @@ void set_form_flash_init(struct form_home form){
 }
 
 //Leer la memoria flash
-void get_form_flash(struct form_home *form){
+void get_form_flash( AM2301_data_t *Thum){
 	size_t len;
 	esp_err_t err;
 	nvs_handle_t ctrl_flash;
@@ -75,10 +75,10 @@ void get_form_flash(struct form_home *form){
 
 		err = nvs_get_str(ctrl_flash,"Humedad1",NULL,&len);
 		if(err==ESP_OK) {
-			err = nvs_get_str(ctrl_flash,"Humedad1",form->Humedad1,&len);
+			err = nvs_get_str(ctrl_flash,"Humedad1",Thum->Humedad1,&len);
 			switch(err){
 				case ESP_OK:
-					ESP_LOGI(nvs_tag,"Humedad1 en flash: %s",form->Humedad1);
+					ESP_LOGI(nvs_tag,"Humedad1 en flash: %s",Thum->Humedad1);
 				break;
 				case ESP_ERR_NVS_NOT_FOUND:
 					ESP_LOGI(nvs_tag,"Humedad1 en flash: none");
@@ -91,10 +91,10 @@ void get_form_flash(struct form_home *form){
 
 		err = nvs_get_str(ctrl_flash,"Temperatura1",NULL,&len);
 		if(err==ESP_OK){
-			err= nvs_get_str(ctrl_flash,"Temperatura1",form->Temperatura1,&len);
+			err= nvs_get_str(ctrl_flash,"Temperatura1",Thum->Temperatura1,&len);
 		switch(err){
 			case ESP_OK:
-				ESP_LOGI(nvs_tag,"Temperatura1 en flash: %s",form->Temperatura1);
+				ESP_LOGI(nvs_tag,"Temperatura1 en flash: %s",Thum->Temperatura1);
 			break;
 			case ESP_ERR_NVS_NOT_FOUND:
 				ESP_LOGI(nvs_tag,"Temperatura1 en flash: none");
@@ -104,10 +104,10 @@ void get_form_flash(struct form_home *form){
 			break;
 
 		}
-		err = nvs_get_u16(ctrl_flash,"Humedad2",&(form->Humedad2));
+		err = nvs_get_u16(ctrl_flash,"Humedad2",&(Thum->Humedad2));
 							switch(err){
 								case ESP_OK:
-									ESP_LOGI(nvs_tag,"Humedad2 en flash: %d",form->Humedad2);
+									ESP_LOGI(nvs_tag,"Humedad2 en flash: %d",Thum->Humedad2);
 								break;
 								case ESP_ERR_NVS_NOT_FOUND:
 									ESP_LOGI(nvs_tag,"Humedad2 en flash: none");
@@ -124,10 +124,10 @@ void get_form_flash(struct form_home *form){
 		if (err != ESP_OK) {
 			printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 		}else{
-			err = nvs_get_u16(ctrl_flash,"Temp2",&(form->Temperatura2));
+			err = nvs_get_u16(ctrl_flash,"Temp2",&(Thum->Temperatura2));
 								switch(err){
 									case ESP_OK:
-										ESP_LOGI(nvs_tag,"Temperatura2 en flash: %d",form->Temperatura2);
+										ESP_LOGI(nvs_tag,"Temperatura2 en flash: %d",Thum->Temperatura2);
 									break;
 									case ESP_ERR_NVS_NOT_FOUND:
 										ESP_LOGI(nvs_tag,"Temperatura2 en flash: none");
@@ -139,10 +139,10 @@ void get_form_flash(struct form_home *form){
 
 			err = nvs_get_str(ctrl_flash,"Datos_Sensor",NULL,&len);
 			if(err==ESP_OK) {
-				err = nvs_get_str(ctrl_flash,"Datos_Sensor",form->Datos_Sensor,&len);
+				err = nvs_get_str(ctrl_flash,"Datos_Sensor",Thum->Datos_Sensor,&len);
 				switch(err){
 					case ESP_OK:
-						ESP_LOGI(nvs_tag,"Datos_Sensor en flash: %s",form->Datos_Sensor);
+						ESP_LOGI(nvs_tag,"Datos_Sensor en flash: %s",Thum->Datos_Sensor);
 					break;
 					case ESP_ERR_NVS_NOT_FOUND:
 						ESP_LOGI(nvs_tag,"Datos_Sensor en flash: none");
@@ -238,7 +238,7 @@ void TareaDHT(void *P){
     float prom_temp = 0, prom_hum = 0;
 
     //Para saber la posicion en que estoy dentro del arreglo de promedios de temp y hum
-    form1.pos_temp = 0;
+    Thum.pos_temp = 0;
 
     //vuelta error indica cuantas vueltas a dado con error, si llega a 10 salta al GPS
     // y con error temp se verifica cuando se envia el mensaje si se logro medir la temperatura
@@ -311,21 +311,21 @@ void TareaDHT(void *P){
         	datos_sensor[46] = auxc2[2];
 
  //       	ESP_LOGI("Sensor_AM2301","Guardare los datos en el struct");
-         	sprintf(form1.Humedad1,"%d",auxi3);
-            sprintf(form1.Temperatura1,"%d",auxi4);
-            form1.Humedad2 = auxi3;
-            form1.Temperatura2 = auxi4;
-            sprintf(form1.Datos_Sensor,"%s",datos_sensor);
-            form1.Humedad3[j1] = (float) auxi3/10;
-            form1.Temperatura3[j1] = (float) auxi4/10;
-            ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", form1.Humedad3[j1],form1.Temperatura3[j1]);
+         	sprintf(Thum.Humedad1,"%d",auxi3);
+            sprintf(Thum.Temperatura1,"%d",auxi4);
+            Thum.Humedad2 = auxi3;
+            Thum.Temperatura2 = auxi4;
+            sprintf(Thum.Datos_Sensor,"%s",datos_sensor);
+            Thum.Humedad3[j1] = (float) auxi3/10;
+            Thum.Temperatura3[j1] = (float) auxi4/10;
+            ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", Thum.Humedad3[j1],Thum.Temperatura3[j1]);
 
 
   //        ESP_LOGI("Sensor_AM2301","Empezare a flashear");
          /*   set_form_flash_init(form1);
             get_form_flash(&form2);*/
             sirve = 0;
-            form1.vuelta_error = 0;
+            Thum.vuelta_error = 0;
 
          //   prom_hum += form1.Humedad3[j1];
          //   prom_temp += form1.Temperatura3[j1];
@@ -333,33 +333,33 @@ void TareaDHT(void *P){
             ESP_LOGI("Sensor_AM2301","La vuelta es: %d", vuelta_temp);
 
             for (int i = 0; i < 16; i++ ){
-            	prom_hum += form1.Humedad3[i];
+            	prom_hum += Thum.Humedad3[i];
 
-            	prom_temp += form1.Temperatura3[i];
+            	prom_temp += Thum.Temperatura3[i];
 
             }
             ESP_LOGI("Sensor_AM2301","Prom hum es: %f", prom_hum);
             ESP_LOGI("Sensor_AM2301","Prom temp es: %f", prom_temp);
-            form1.Prom_hum[form1.pos_temp] = prom_hum/16;
-            form1.Prom_temp[form1.pos_temp] = prom_temp/16;
+            Thum.Prom_hum[Thum.pos_temp] = prom_hum/16;
+            Thum.Prom_temp[Thum.pos_temp] = prom_temp/16;
             prom_hum =  0.0;
             prom_temp = 0.0;
-        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum[form1.pos_temp]);
-        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp[form1.pos_temp]);
-        	form1.pos_temp++;
+        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",Thum.Prom_hum[Thum.pos_temp]);
+        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",Thum.Prom_temp[Thum.pos_temp]);
+        	Thum.pos_temp++;
         }
         else{
             ESP_LOGE("Sensor_AM2301","No fue posible leer datos del AM2301");
             sirve = 1;
-            form1.vuelta_error++;
+            Thum.vuelta_error++;
          //   if (form1.vuelta_error < 10){
           //	xEventGroupSetBits(event_group, BEGIN_TASK1);
           //  }
             //Aqui verifico si ya tuve 10 errores seguidos midiendo la temperatura,
             //al 10mo sigue a la siguiente tarea y deja el flag error temp en 1
-            if (form1.vuelta_error >= 10){
-            	form1.vuelta_error = 0;
-            	form1.error_temp = 1;
+            if (Thum.vuelta_error >= 10){
+            	Thum.vuelta_error = 0;
+            	Thum.error_temp = 1;
             	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
             	break;
             }
@@ -371,7 +371,8 @@ void TareaDHT(void *P){
         	form1.Prom_temp = prom_temp/16;
         	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",form1.Prom_hum);
         	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",form1.Prom_temp);*/
-        	xQueueReceive(xQueue,&,100/portTICK_RATE_MS);
+        	xQueueOver(xQueue,&,100/portTICK_RATE_MS);
+        	xQueueOverwrite(xQueue_temp)
     	//	xEventGroupClearBits(event_group, BEGIN_TASK1);
     	//	xEventGroupSetBits(event_group, BEGIN_TASK3);
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);

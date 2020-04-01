@@ -38,8 +38,8 @@ char auxc4_echo[] = "AT+GPSRD=1\r\nOK\r\n";
 char auxc5_echo[1] = "$";
 char auxc7_echo[1] = "B";
 
-//Ronda servira para indicar la ronda en que se encuentra pidiendo los datos GPS
-int ronda = 0;
+
+
 
 //posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
 uint16_t posicion_echo[13] = {0};
@@ -64,6 +64,8 @@ extern EventGroupHandle_t event_group;
 extern const int BEGIN_TASK2;
 
 extern const int SYNC_BIT_TASK2;
+
+uint8_t ronda = 0;
 
 //Para la cola
 
@@ -463,6 +465,10 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     uint8_t * parar_RD1 =  malloc(10);
     parar_RD1 = 0;
 
+  /*  //Ronda servira para indicar la ronda en que se encuentra pidiendo los datos GPS
+    uint8_t * ronda =  malloc(256);
+    ronda = 0;*/
+
 
     // Se definen los comandos AT que seran enviados con su longitud y un auxiliar
     // Se ignoraron ya que puede ponerse directamente en la funcion
@@ -509,8 +515,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
         		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
         		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
     		} else {
-    			//Si ya no es la primera vuelta entonces hago len5=2 para que entre en el siguiente if
-    			len5 = 2;
+    			//Si ya no es la primera vuelta entonces hago esto para que entre en el siguiente if
+    			len5 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
     			ESP_LOGI(TAG1, "Len5 es 2\r\n");
     		}
     	break;
@@ -583,21 +589,21 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
      	        	    }
     	        		break;
     	        	case 1:
-    	        		if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
-    	        			auxi1_echo++;
-    	        			len5 = 0;
-    	        			//Ahora se esperara 40 segundos para que se logre conectar a la red GPS
-    	        			if (primera_vuelta == 0){
-    	        			//	primera_vuelta = 1;
-    	        				ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
-    	        				ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
-    	        				vTaskDelay(pdMS_TO_TICKS(50000));
+    	        		if (primera_vuelta == 0){
+    	        			if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
+    	        			   auxi1_echo++;
+    	        			   len5 = 0;
+    	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
+    	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
+    	        		       ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
+    	        		       vTaskDelay(pdMS_TO_TICKS(50000));
     	        			}
     	        		} else {
-    	        			if (primera_vuelta == 0){
-    	        				ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 OK \r\n");
-    	        			}
-     	        	    }
+    	        			if (strncmp(auxc2_echo,auxc1_echo,10) == 0){
+	        		    	auxi1_echo++;
+	        		    	len5 = 0;
+	        				}
+	        			}
     	        		break;
     	        		//Este caso causa molestia de vez en cuando y aparte no es necesario
     	        		//para verificar si llegan los datos
@@ -697,6 +703,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        					//Para detener el envio de datos del GPS se manda lo siguiente
     	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
     	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+    	        					xEventGroupClearBits(event_group, BEGIN_TASK2);
     	        				}
     	        			}
 

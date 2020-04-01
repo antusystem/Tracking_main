@@ -258,20 +258,23 @@ static void on_ip_event(void *arg, esp_event_base_t event_base,
     }
 }
 
-void Mandar_mensaje(void *P)
+
+
+
+void Mandar_mensaje2(void *P)
 {
 	char message[318] = "Welcome to ESP32!";
-	uint8_t vuelta_men = 0, led_gsm = 0;
+	uint8_t  led_gsm = 0;
+	gps_data_t gps_data2;
+	AM2301_data_t Thum2;
 
 
 	printf("Entre en mandar mensaje \r\n");
 		for(;;){
 
 		xEventGroupSync(event_group,BEGIN_TASK1,0xC0,portMAX_DELAY);
-		xEventGroupClearBits(event_group, BEGIN_TASK3);
 	    xEventGroupClearBits(event_group, SYNC_BIT_TASK1);
-	    xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
-		//xEventGroupWaitBits(event_group,BEGIN_TASK2,true,true,portMAX_DELAY);
+	   	xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
 
 		//El led prendera 1 segundo al entrar en esta etapa
     	if (led_gsm == 0){
@@ -281,100 +284,27 @@ void Mandar_mensaje(void *P)
             led_gsm = 1;
     	}
 
-#if CONFIG_LWIP_PPP_PAP_SUPPORT
-    esp_netif_auth_type_t auth_type = NETIF_PPP_AUTHTYPE_PAP;
-#elif CONFIG_LWIP_PPP_CHAP_SUPPORT
-    esp_netif_auth_type_t auth_type = NETIF_PPP_AUTHTYPE_CHAP;
-#else
-#error "Unsupported AUTH Negotiation"
-#endif
-
-    ESP_ERROR_CHECK(esp_netif_init());
-    if (vuelta_men == 0){
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, NULL));
-    }
-
-
-
     	ESP_LOGI(TAG, "La latitud prom es: %f", gps_data.latitude_prom);
     	ESP_LOGI(TAG, "La latitud dir es: %s", gps_data.latitude_direct);
         ESP_LOGI(TAG, "La longitud prom es: %f", gps_data.longitude_prom);
       	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);
 
-
-
-
-        /* Configurar los niveles de las salidas y el pulso necesario para prender el SIM800l*/
-        gpio_set_level(SIM800l_PWR, 1);
-        gpio_set_level(SIM800l_RST, 1);
-        gpio_set_level(SIM800l_PWR_KEY, 1);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        gpio_set_level(SIM800l_PWR_KEY, 0);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        gpio_set_level(SIM800l_PWR_KEY, 1);
-
-
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-
-    // Init netif object
-    if (vuelta_men == 0){
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
-    esp_netif_t *esp_netif = esp_netif_new(&cfg);
-    assert(esp_netif);
-    }
-
-    /* create dte object */
-    esp_modem_dte_config_t config = ESP_MODEM_DTE_DEFAULT_CONFIG();
-    modem_dte_t *dte = esp_modem_dte_init(&config);
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    /* Register event handler */
-    ESP_ERROR_CHECK(esp_modem_set_event_handler(dte, modem_event_handler, ESP_EVENT_ANY_ID, NULL));
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    /* create dce object */
-#if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
-    modem_dce_t *dce = sim800_init(dte);
-#elif CONFIG_EXAMPLE_MODEM_DEVICE_BG96
-    modem_dce_t *dce = bg96_init(dte);
-#else
-#error "Unsupported DCE"
-#endif
-    ESP_ERROR_CHECK(dce->set_flow_ctrl(dce, MODEM_FLOW_CONTROL_NONE));
-    ESP_ERROR_CHECK(dce->store_profile(dce));
-    /* Print Module ID, Operator, IMEI, IMSI */
-    ESP_LOGI(TAG, "Module: %s", dce->name);
-    ESP_LOGI(TAG, "Operator: %s", dce->oper);
-    ESP_LOGI(TAG, "IMEI: %s", dce->imei);
-    ESP_LOGI(TAG, "IMSI: %s", dce->imsi);
-    /* Get signal quality */
-    uint32_t rssi = 0, ber = 0;
-    ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));
-    ESP_LOGI(TAG, "rssi: %d, ber: %d", rssi, ber);
-    /* Get battery voltage */
-    uint32_t voltage = 0, bcs = 0, bcl = 0;
-    ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
-    ESP_LOGI(TAG, "Battery voltage: %d mV", voltage);
-
     /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
      * */
+    xQueueReceive(xQueue_temp,&Thum2,portMAX_DELAY);
+
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
     if (Thum.error_temp == 0){
-		#if CONFIG_EXAMPLE_SEND_MSG
-    	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",Thum.Humedad1[0],Thum.Humedad1[1],Thum.Humedad1[2],Thum.Temperatura1[0],Thum.Temperatura1[1],Thum.Temperatura1[2]);
-    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
-		#endif
+    	sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+    	ESP_LOGI(TAG, "[%s]", message);
     } else {
-
     	Thum.error_temp = 0;
-		#if CONFIG_EXAMPLE_SEND_MSG
-    	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
-    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
-		#endif
+    	sprintf(message,"No se logro medir la temperatura. Revisar las conexiones.");
+    	ESP_LOGI(TAG, "[%s] ", message);
     }
+
+    xQueueReceive(xQueue_gps,&gps_data2,portMAX_DELAY);
 
     switch (puerta_b){
     case 0:
@@ -382,31 +312,20 @@ void Mandar_mensaje(void *P)
         if (gps_data.error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
         	if (gps_data.year == 20){
-				#if CONFIG_EXAMPLE_SEND_MSG
-        		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
-        		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-				#endif
 
-				#if CONFIG_EXAMPLE_SEND_MSG
-        		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
-        		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-				#endif
+        		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
+        		ESP_LOGI(TAG, "[%s] ", message);
+        		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
+            	ESP_LOGI(TAG, "[%s] ", message);
         	} else{
-			#if CONFIG_EXAMPLE_SEND_MSG
+
 			sprintf(message,"No se logro conectar a la red GPS.");
-			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-			ESP_LOGI(TAG, "Send send message [%s] ok", message);
-			#endif
+			ESP_LOGI(TAG, "[%s] ", message);
         	}
         } else{
-  			gps_data.error_gps = 0;
-    		#if CONFIG_EXAMPLE_SEND_MSG
+        	gps_data.error_gps = 0;
     		sprintf(message,"No se logro conectar con el modulo GPS.");
-    		ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-			#endif
+    		ESP_LOGI(TAG, "[%s] ", message);
         }
     break;
     case 1:
@@ -414,26 +333,20 @@ void Mandar_mensaje(void *P)
     	if (gps_data.error_gps == 0){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
     		if (gps_data.year == 20){
-				#if CONFIG_EXAMPLE_SEND_MSG
-    			sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data.latitude_prom,gps_data.latitude_direct,gps_data.longitude_prom,gps_data.longitude_direct);
-    			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    			ESP_LOGI(TAG, "Send send message [%s] ok", message);
-				#endif
+
+    			sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
+			ESP_LOGI(TAG, "[%s] ", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
     			}
- 				#if CONFIG_EXAMPLE_SEND_MSG
-    	        sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data.day,gps_data.mes,gps_data.year,gps_data.hour,gps_data.minute,gps_data.second);
-    	        ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    	        ESP_LOGI(TAG, "Send send message [%s] ok", message);
-    			#endif
+
+    	        sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
+  		ESP_LOGI(TAG, "[%s] ", message);
     	    } else{
-				#if CONFIG_EXAMPLE_SEND_MSG
+
     	    	sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
-    	    	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    	    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
-				#endif
+ 		ESP_LOGI(TAG, "[%s] ", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
@@ -441,11 +354,9 @@ void Mandar_mensaje(void *P)
     	    }
     	} else{
 			gps_data.error_gps = 0;
-			#if CONFIG_EXAMPLE_SEND_MSG
+
 			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
-			ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-			ESP_LOGI(TAG, "Send send message [%s] ok", message);
-			#endif
+			ESP_LOGI(TAG, "[%s] ", message);
 			if (puerta_a == 0){
 				puerta_b = 0;
 				puerta_c = 0;
@@ -453,24 +364,9 @@ void Mandar_mensaje(void *P)
     	}
     break;
     }
-
-
-
-    /* Power down module */
-    ESP_ERROR_CHECK(dce->power_down(dce));
-    ESP_LOGI(TAG, "Power down");
-    ESP_ERROR_CHECK(dce->deinit(dce));
-    ESP_ERROR_CHECK(dte->deinit(dte));
-    ESP_LOGI(TAG, "Power down2");
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
-//    xEventGroupClearBits(event_group, BEGIN_TASK2);
-//    xEventGroupSetBits(event_group, BEGIN_TASK1);
-    vuelta_men = 1;
     led_gsm = 0;
 	}
 }
-
-//xQueueHandle Cola_sensor;
 
 void app_main(void)
 {
@@ -495,16 +391,18 @@ void app_main(void)
 	gpio_set_direction(GPIO_NUM_27, GPIO_MODE_OUTPUT);
 	gpio_set_level(GPIO_NUM_27, 0);
 
+	//Creo el grupo de eventos y las colas
 	event_group = xEventGroupCreate();
 	xQueue_temp = xQueueCreate(1, sizeof(AM2301_data_t));
 	xQueue_gps = xQueueCreate(1, sizeof(gps_data_t));
 
 
-	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 8, NULL,0);
-	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*6, NULL, 6, NULL,0);
-	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje", 1024*3, NULL, 4, NULL,0);
+	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 6, NULL,0);
+	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*7, NULL, 6, NULL,1);
+	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 8, NULL,0);
 
-	xEventGroupSetBits(event_group, BEGIN_TASK2);
+//	xEventGroupSetBits(event_group, BEGIN_TASK2);
+
 
 	//Espera a que la puerta se abra para dar la senal
 	while(1){

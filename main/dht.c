@@ -23,6 +23,8 @@ extern QueueHandle_t xQueue_temp;
 
 extern const int BEGIN_TASK1;
 
+extern const int BEGIN_TASK2;
+
 extern const int SYNC_BIT_TASK1;
 /*
 extern const int BEGIN_TASK2;
@@ -358,6 +360,8 @@ void TareaDHT(void *P){
         if (sirve == 0 && vuelta_temp >=16){
         	vuelta_temp = 0;
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
+        	xEventGroupSetBits(event_group, BEGIN_TASK2);
+        	xEventGroupClearBits(event_group, BEGIN_TASK1);
     		break;
         }
         }

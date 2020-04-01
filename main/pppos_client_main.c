@@ -360,15 +360,15 @@ void Mandar_mensaje(void *P)
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
      * */
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
-    if (Thum.error_temp == 0){
+    if (form1.error_temp == 0){
 		#if CONFIG_EXAMPLE_SEND_MSG
-    	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",Thum.Humedad1[0],Thum.Humedad1[1],Thum.Humedad1[2],Thum.Temperatura1[0],Thum.Temperatura1[1],Thum.Temperatura1[2]);
+    	sprintf(message,"La humedad es: %c%c.%c  %% y la temperatura es: %c%c.%c C",form1.Humedad1[0],form1.Humedad1[1],form1.Humedad1[2],form1.Temperatura1[0],form1.Temperatura1[1],form1.Temperatura1[2]);
     	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     	ESP_LOGI(TAG, "Send send message [%s] ok", message);
 		#endif
     } else {
 
-    	Thum.error_temp = 0;
+    	form1.error_temp = 0;
 		#if CONFIG_EXAMPLE_SEND_MSG
     	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
     	ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));

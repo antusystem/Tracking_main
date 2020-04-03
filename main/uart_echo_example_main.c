@@ -98,15 +98,26 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	ESP_LOGI("PRUEBA","declare  RMCparsing");
 	//Para contar cuantas veces se guardan los datos se aumenta la cantidad de ronda
 	GPS_data->ronda++;
-	ESP_LOGI("PRUEBA","ronda es %d",GPS_data->ronda);
+	ESP_LOGI("TAG2","ronda es %d",GPS_data->ronda);
 	GPS_data->stage++;
+	ESP_LOGI("TAG2","flag %d es %d",0,flags2[0]);
+	ESP_LOGI("TAG2","flag %d es %d",1,flags2[1]);
+	ESP_LOGI("TAG2","flag %d es %d",2,flags2[2]);
+	ESP_LOGI("TAG2","flag %d es %d",3,flags2[3]);
+	ESP_LOGI("TAG2","flag %d es %d",4,flags2[4]);
+	ESP_LOGI("TAG2","flag %d es %d",5,flags2[5]);
+	ESP_LOGI("TAG2","flag %d es %d",6,flags2[6]);
+	ESP_LOGI("TAG2","flag %d es %d",7,flags2[7]);
+	ESP_LOGI("TAG2","flag %d es %d",8,flags2[8]);
+	ESP_LOGI("TAG2","flag %d es %d",9,flags2[9]);
+	ESP_LOGI("TAG2","flag %d es %d",10,flags2[10]);
 
 
 //Guardar la posicion de las comas en flags2
 	for(int k1 = 0; k1 < 11; k1++){
 		char* pos = strstr(GNRMC_data,coma);
 		flags2[k1] = pos - GNRMC_data;
-	//	ESP_LOGI(TAG2,"flag2 es: %d \r\n",flags2[k1]);
+		ESP_LOGI(TAG2,"flag2 es: %d \r\n",flags2[k1]);
 		GNRMC_data[flags2[k1]] = '-';
 	}
 	ESP_LOGI("PRUEBA","Ya tengo las comas");
@@ -441,6 +452,35 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 	//Todo lo que esta comentado arriba es por si se piensa implementar para ordenar otras oraciones
 	return GPS_data;
 }
+/*
+static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA, uint16_t leng)
+{
+	uint16_t posicion[13] = {0};
+	NMEA_sentences oracion = 0;
+	for(uint8_t k1 = 0; k1 < leng; k1++){
+		char* posi = strstr(datos_NMEA,'$');
+		posicion[k1] = posi - datos_NMEA;
+		ESP_LOGI(TAG2,"posicion es: %d \r\n",posicion[k1]);
+		datos_NMEA[posicion[k1]] = '-';
+	}
+
+	for (oracion; oracion < 4; oracion++){
+		switch (oracion){
+		case GNGGA:
+			strncpy(datos_NMEA->NMEA_GNGGA,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
+			ESP_LOGI("PRUEBA","Caso 0.1");
+			rmc_data.time_UTC[10] = 0x00;
+		break;
+		}
+
+	}
+
+	for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
+		NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
+	    i3++;
+	}
+}
+*/
 
 
   void echo_task(void *arg)
@@ -498,7 +538,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     gps_data.ronda_error = 0;
     gps_data.error_gps = 0;
     gps_data.ronda = 0;
-    gps_data.stage = 1;
+    gps_data.stage = 0;
 
 
 
@@ -635,6 +675,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        	    //Entrara aca despues de mandar AT+GPSRD=1
     	        	    //En este ciclo se encarga de separar las oraciones del bus NMEA del GPS
     	        			ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
+
     	        			int i2 = 0;
     	        			//En este for escanea el buffer por la posicion de $
     	        			for (uint16_t i = 0; i < len; i++){
@@ -713,6 +754,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        					primera_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     	        					gps_data.ronda = 0;
+    	        					bzero(NMEA_data.NMEA_GNRMC,BUF_SIZE);
     	        					len7 = 0;
     	        					prom_lat = 0;
     	        					prom_lon = 0;

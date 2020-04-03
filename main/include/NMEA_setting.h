@@ -43,6 +43,17 @@ typedef enum
 	date,
 } rmc_stages;
 
+typedef enum
+{
+	GNGGA = 0,
+	GPGSA,
+	BDGSA,
+	GPGSV,
+	BDGSV,
+	GNRMC,
+	GNVTG,
+} NMEA_sentences;
+
 typedef struct {
     float latitude[10];                                                /*!< Latitude (degrees) */
     float latitude_prom;
@@ -70,7 +81,7 @@ typedef struct {
     float variation;                                               /*!< Magnetic variation */
     uint8_t error_gps;
     uint8_t ronda_error;
-    uint8_t ronda;
+    uint16_t ronda;
     rmc_stages stage;
 } gps_data_t;
 

@@ -498,7 +498,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     gps_data.ronda_error = 0;
     gps_data.error_gps = 0;
     gps_data.ronda = 0;
-    gps_data.stage = 0;
+    gps_data.stage = 1;
 
 
 

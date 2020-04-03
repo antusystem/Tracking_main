@@ -26,7 +26,7 @@
 NMEA_data_t NMEA_data;
 
 //Se definen auxiliares
-int auxi1_echo = 0, auxi2_echo = 0;
+uint8_t auxi1_echo = 0, auxi2_echo = 0;
 
 char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
 //El siguiente auxiliar se usa para tener otra variable con los datos que llegan al buffer de recepcion
@@ -65,7 +65,7 @@ extern const int BEGIN_TASK2;
 
 extern const int SYNC_BIT_TASK2;
 
-uint8_t ronda = 0;
+
 
 //Para la cola
 
@@ -73,14 +73,14 @@ extern QueueHandle_t xQueue_gps;
 
 static const char *TAG1 = "uart_echo_example";
 
-static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
+static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 	//Esta funcion ordena los datos de RMC
 	// Con la variable ronda (que se aumenta cada vez que llega algo al buffer) se lleva el control
 	// de la posicion que se guardara en el arreglo de latitud y longitud. Al llegar a 10 debe parar
 	// de enviar datos
 	ESP_LOGI("PRUEBA","Declarare en RMCparsing");
-	ESP_LOGI("PRUEBA","ronda es %d",ronda);
+	ESP_LOGI("PRUEBA","ronda es %d",GPS_data->ronda);
 	rmc_data_t rmc_data;
 	uint16_t flags2[11] = {0};
 //	int l1 = 0;
@@ -97,8 +97,9 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 	//Para calcular un promedio final de los valores se agrega prom de auxiliar
 	ESP_LOGI("PRUEBA","declare  RMCparsing");
 	//Para contar cuantas veces se guardan los datos se aumenta la cantidad de ronda
-	ronda++;
-	ESP_LOGI("PRUEBA","ronda es %d",ronda);
+	GPS_data->ronda++;
+	ESP_LOGI("PRUEBA","ronda es %d",GPS_data->ronda);
+	GPS_data->stage++;
 
 
 //Guardar la posicion de las comas en flags2
@@ -199,11 +200,11 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 			//Obtener la longitud en deg y guardolo en GPSdata
 	//		float lon1 = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
 
-			GPS_data->latitude[ronda] = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
-			ESP_LOGI(TAG2,"La latitud en DEG es: %f\r\n",GPS_data->latitude[ronda]);
-			ESP_LOGI(TAG2,"La ronda es: %d\r\n",ronda);
+			GPS_data->latitude[GPS_data->ronda] = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
+			ESP_LOGI(TAG2,"La latitud en DEG es: %f\r\n",GPS_data->latitude[GPS_data->ronda]);
+			ESP_LOGI(TAG2,"La ronda es: %d\r\n",GPS_data->ronda);
 
-			prom_lat +=  GPS_data->latitude[ronda];
+			prom_lat +=  GPS_data->latitude[GPS_data->ronda];
 
 			ESP_LOGI(TAG2,"El pre -prom lat en DEG es: %f\r\n",prom_lat);
 
@@ -256,10 +257,10 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data ){
 	//		ESP_LOGI(TAG2,"La longitud en degf es: %f\r\n",rmc_data.longitude_deg_f);
 
 			//Obtener la longitud en deg y guardolo
-			GPS_data->longitude[ronda] = (float)rmc_data.longitude_deg_f + (float)(rmc_data.longitude_min_f/60);
-			ESP_LOGI(TAG2,"La longitud en DEG es: %f\r\n",GPS_data->longitude[ronda]);
+			GPS_data->longitude[GPS_data->ronda] = (float)rmc_data.longitude_deg_f + (float)(rmc_data.longitude_min_f/60);
+			ESP_LOGI(TAG2,"La longitud en DEG es: %f\r\n",GPS_data->longitude[GPS_data->ronda]);
 
-			prom_lon +=  GPS_data->longitude[ronda];
+			prom_lon +=  GPS_data->longitude[GPS_data->ronda];
 			ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lon);
 			GPS_data->longitude_prom = prom_lon/10;
 			ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
@@ -388,7 +389,9 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 
 	if (data[2] == RMC[0] && data[3] == RMC[1] && data[4] == RMC[2]){
 		ESP_LOGI(TAG2,"Empezara a parsear RMC");
+		ESP_LOGI(TAG2,"ronda es %d", GPS_data.ronda);
 		GPS_data  = RMC_parsing(data, &GPS_data);
+		ESP_LOGI(TAG2,"ronda es %d", GPS_data.ronda);
 	}
 
 
@@ -474,9 +477,9 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     uint8_t * parar_RD1 =  malloc(10);
     parar_RD1 = 0;
 
-  /*  //Ronda servira para indicar la ronda en que se encuentra pidiendo los datos GPS
-    uint8_t * ronda =  malloc(256);
-    ronda = 0;*/
+    /*//Ronda servira para indicar la ronda en que se encuentra pidiendo los datos GPS
+    uint8_t * ronda =  malloc(sizeof( uint8_t));
+    *ronda = 0;*/
 
 
     // Se definen los comandos AT que seran enviados con su longitud y un auxiliar
@@ -488,12 +491,14 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     char *com3 = "AT+GPSRD=1\r\n";
     int len6 = 12;*/
 
-    int len3 = 0;
-    int len5 = 0;
-    int len7 = 0;
+    uint8_t len3 = 0;
+    uint8_t len5 = 0;
+    uint8_t len7 = 0;
 
     gps_data.ronda_error = 0;
     gps_data.error_gps = 0;
+    gps_data.ronda = 0;
+    gps_data.stage = 0;
 
 
 
@@ -570,7 +575,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	     	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
     	     	//printf(" Copio el buffer, auxc2 es: %s",auxc2)
     	     	ESP_LOGI(TAG1, " Ya termino auxc2");
-    	     	ESP_LOGI(TAG1, "ronda es: %d",ronda);
+    	     	ESP_LOGI(TAG1, "ronda es: %d",gps_data.ronda);
 
 
     	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y "ATGPSRD"
@@ -607,7 +612,7 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
     	        		       ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
-    	        		       vTaskDelay(pdMS_TO_TICKS(10000));
+    	        		       vTaskDelay(pdMS_TO_TICKS(3000));
     	        			}
     	        		} else {
     	        			if (strncmp(auxc2_echo,auxc1_echo,10) == 0){
@@ -698,14 +703,16 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        		//	GPS_parsing(NMEA_data.NMEA_GNGGA, gps_data);
 
     	        			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
+    	        			ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
     	        			gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
+    	        	//		gps_data = RMC_parsing(NMEA_data.NMEA_GNRMC, &gps_data, ronda);
     	        			xQueueOverwrite(xQueue_gps,&gps_data);
 
     	        			if (primera_vuelta == 0){
-    	        				if (ronda == 10 ){
+    	        				if (gps_data.ronda == 10 ){
     	        					primera_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
-    	        					ronda = 0;
+    	        					gps_data.ronda = 0;
     	        					len7 = 0;
     	        					prom_lat = 0;
     	        					prom_lon = 0;
@@ -718,9 +725,9 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
     	        				}
     	        			}
 
-	        				if (ronda == 40 ){
+	        				if (gps_data.ronda == 40 ){
 	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
-	        					ronda = 0;
+	        					gps_data.ronda = 0;
 	        					len7 = 0;
 	        					prom_lat = 0;
 	        					prom_lon = 0;

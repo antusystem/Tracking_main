@@ -30,6 +30,19 @@ typedef struct {
     char NMEA_GNVTG[BUF_SIZE];
 } NMEA_data_t;
 
+typedef enum
+{
+	time_UTC = 0,	//Valor para indicara el tiempo en UTC
+	active,			//Dice si esta conectado, aunque no siempre funciona bien en el A9G
+	latitude,
+	latitude_dir,
+	longitude,
+	longitude_dir,
+	speed,
+	track,
+	date,
+} rmc_stages;
+
 typedef struct {
     float latitude[10];                                                /*!< Latitude (degrees) */
     float latitude_prom;
@@ -57,27 +70,11 @@ typedef struct {
     float variation;                                               /*!< Magnetic variation */
     uint8_t error_gps;
     uint8_t ronda_error;
+    uint8_t ronda;
+    rmc_stages stage;
 } gps_data_t;
 
-typedef struct {
-    char time_UTC[11];
-    char latitude[10];                                                /*!< Latitude (degrees) */
-    char latitude_deg[318];
-    float latitude_deg_f;
-    char latitude_min[9];
-    float latitude_min_f;
-    char latitude_dir[2];
-    char longitude[10];                                               /*!< Longitude (degrees) */
-    char longitude_deg[318];
-    float longitude_deg_f;
-    char longitude_min[7];
-    float longitude_min_f;
-    char longitude_dir[2];
-    char fix[2]; 													 /*!< Fix status */
-    char sats_in_use[3];   										 /*!< Number of satellites in use */
-    char dop_h[5];                                                   /*!< Horizontal dilution of precision */
-    char altitude[5];                                                /*!< Altitude (meters) */
-} gga_data_t;
+
 
 typedef struct {
     char time_UTC[11];
@@ -99,14 +96,11 @@ typedef struct {
     char date[7];   										 /*!< Number of satellites in use */
 } rmc_data_t;
 
+
+
 gps_data_t gps_data;
 
 void echo_task(void *P);
-
-
-
-
-
 
 
 #endif /* MAIN_NMEA_SETTING_H_ */

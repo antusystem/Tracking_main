@@ -357,7 +357,7 @@ void TareaDHT(void *P){
             }
         }
 
-        if (sirve == 0 && vuelta_temp >=8){
+        if (sirve == 0 && vuelta_temp >=4){
         	vuelta_temp = 0;
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
         	xEventGroupSetBits(event_group, BEGIN_TASK2);

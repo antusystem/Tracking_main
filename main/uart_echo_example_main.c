@@ -23,10 +23,7 @@
 
 #include "NMEA_setting.h"
 
-NMEA_data_t NMEA_data;
 
-//Se definen auxiliares
-uint8_t auxi1_echo = 0, auxi2_echo = 0;
 
 char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
 //El siguiente auxiliar se usa para tener otra variable con los datos que llegan al buffer de recepcion
@@ -40,23 +37,18 @@ char auxc7_echo[1] = "B";
 
 
 
-
-//posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
-uint16_t posicion_echo[13] = {0};
-
 //Variables globales para calcular promedios en varias funciones
 float prom_lon = 0;
 float prom_lat = 0;
 
-//Para saber si es la primera vez que mando AT + GPS = 1
-uint8_t primera_vuelta = 0;
+
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
 #define ECHO_TEST_RXD  (GPIO_NUM_5)
 #define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
 #define ECHO_TEST_CTS  (UART_PIN_NO_CHANGE)
-int len = 0;
+uint16_t len = 0;
 
 //Para usar gestion de eventos
 extern EventGroupHandle_t event_group;
@@ -404,110 +396,29 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 		GPS_data  = RMC_parsing(data, &GPS_data);
 		ESP_LOGI(TAG2,"ronda es %d", GPS_data.ronda);
 	}
-
-
-	//Se crean las variables auxiliares para comprobar de que tipo son luego se llama
-	//la funcion que lo ordenara
-
-	/*	char GSA[3] = "GSA";
-		char GSV[3] = "GSV";
-		char VTG[3] = "VTG";
-		char GGA[3] = "GGA";*/
-/*	if (data[2] == GGA[0] && data[3] == GGA[1] && data[4] == GGA[2]){
-
-		ESP_LOGI(TAG2,"Empezara a parsear GGA");
-		ESP_LOGI(TAG1,"GNGGA es: %s\r\n",NMEA_data.NMEA_GNGGA);
-		GGA_parsing(data, GPS_data);
-
-	}*/
-/*
-	if (GPGSA_data[2] == GSA[0] && GPGSA_data[3] == GSA[1] && GPGSA_data[4] == GSA[2]){
-
-		ESP_LOGI(TAG2,"Empezara a parsear GSA");
-
-	}
-
-	if (BDGSA_data[2] == GSA[0] && BDGSA_data[3] == GSA[1] && BDGSA_data[4] == GSA[2]){
-		ESP_LOGI(TAG2,"Empezara a parsear GSA");
-
-	}
-
-	if (GPGSV_data[2] == GSV[0] && GPGSV_data[3] == GSV[1] && GPGSV_data[4] == GSV[2]){
-		ESP_LOGI(TAG2,"Empezara a parsear GSV");
-
-	}
-
-	if (BDGSV_data[2] == GSV[0] && BDGSV_data[3] == GSV[1] && BDGSV_data[4] == GSV[2]){
-		ESP_LOGI(TAG2,"Empezara a parsear GSV");
-
-	}
-*/
-
-/*
-	if (GNVTG_data[2] == VTG[0] && GNVTG_data[3] == VTG[1] && GNVTG_data[4] == VTG[2]){
-		ESP_LOGI(TAG2,"Empezara a parsear VTG");
-
-	}
-*/
-	//Todo lo que esta comentado arriba es por si se piensa implementar para ordenar otras oraciones
 	return GPS_data;
 }
-/*
-static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA, uint16_t leng)
-{
-	uint16_t posicion[13] = {0};
-	NMEA_sentences oracion = 0;
-	for(uint8_t k1 = 0; k1 < leng; k1++){
-		char* posi = strstr(datos_NMEA,'$');
-		posicion[k1] = posi - datos_NMEA;
-		ESP_LOGI(TAG2,"posicion es: %d \r\n",posicion[k1]);
-		datos_NMEA[posicion[k1]] = '-';
-	}
 
-	for (oracion; oracion < 4; oracion++){
-		switch (oracion){
-		case GNGGA:
-			strncpy(datos_NMEA->NMEA_GNGGA,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
-			ESP_LOGI("PRUEBA","Caso 0.1");
-			rmc_data.time_UTC[10] = 0x00;
-		break;
-		}
 
-	}
-
-	for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
-		NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
-	    i3++;
-	}
-}
-*/
 
 
   void echo_task(void *arg)
 {
-	//Se inicia la tarea configurando los Uart 0 y Uart 2
-    uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-    };
-    ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
-    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_0, &uart_config);
-    uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, ECHO_TEST_RTS, ECHO_TEST_CTS);
 
-    ESP_LOGI(TAG1, "Uart 0 Iniciado");
-    ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
+    gps_data_t gps_data;
 
-    uart_param_config(UART_NUM_2, &uart_config);
-    uart_set_pin(UART_NUM_2, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS);
-    uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
+    NMEA_data_t NMEA_data;
+    //NMEA_data_t NMEA_data2;
+
+    //Se definen auxiliares
+    uint8_t auxi1_echo = 0, auxi2_echo = 0;
 
 
-    ESP_LOGI(TAG1, "Uart 2 Iniciado");
+    //posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
+    uint16_t posicion_echo[13] = {0};
+
+    //Para saber si es la primera vez que mando AT + GPS = 1
+    uint8_t primera_vuelta = 0;
 
     //Se declara la variable que copiara lo que llegue al buffer
     //uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
@@ -576,8 +487,10 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	break;
     	case 2:
     		//En la tercera vuelta solicita los datos del GPS
+    		if (len7 == 0){
     		len7 = uart_write_bytes(UART_NUM_2,"AT+GPSRD=1\r\n", 12);
     		ESP_LOGI(TAG1, "envio: AT+GPSRD=1\r\n");
+    		}
 		break;
     	}
     	}
@@ -680,22 +593,22 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			//En este for escanea el buffer por la posicion de $
     	        			for (uint16_t i = 0; i < len; i++){
     	        				if (auxc2_echo[i] == auxc5_echo[0] ){
-    	        						posicion_echo[i2] = i;
-    	        						/*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
-    	        						ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
-    	        						i2++;
+    	        					posicion_echo[i2] = i;
+    	        					/*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
+    	        					ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
+    	        					i2++;
     	        				}
     	        			}
     	        			// Empezare a guardar en el struct escaladamente segun la posicion de $
     	        			// Se guardara cada oracion por separado
     	        			int i3 = 0;
     	        			for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
-    	        				NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
+    	        			    NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
     	        			    i3++;
     	        			}
     	        			i3 = 0;
     	        			for (int i = posicion_echo[1] + 1; i < (posicion_echo[2]-1); i++){
-    	        				NMEA_data.NMEA_GPGSA[i3]= tx_buf[i];
+    	        			    NMEA_data.NMEA_GPGSA[i3]= tx_buf[i];
     	        			    i3++;
     	        			}
     	        			i3 = 0;
@@ -716,20 +629,20 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			    //para empezar a guardar
     	        			    i3 = 0;
     	        			    if (tx_buf[posicion_echo[j]+1] == auxc7_echo[0]){
-    	        			        for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
-    	        			        	NMEA_data.NMEA_BDGSV[i3]= tx_buf[i];
-    	        			        	i3++;
-    	        			        }
-    	        			        i3 = 0;
-    	        			        for (int i = posicion_echo[j+1] + 1; i < (posicion_echo[j+2]-1); i++){
-    	        			        	NMEA_data.NMEA_GNRMC[i3]= tx_buf[i];
-    	        			        	i3++;
-    	        			        }
-    	        			        i3 = 0;
-    	        			        for (int i = posicion_echo[j+2] + 1; i < (posicion_echo[j+2]+39); i++){
-    	        			        	NMEA_data.NMEA_GNVTG[i3]= tx_buf[i];
-    	        			        	i3++;
-    	        			        }
+    	        			    	for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
+    	        			    		NMEA_data.NMEA_BDGSV[i3]= tx_buf[i];
+    	        			    	    i3++;
+    	        			    	 }
+    	        			    	i3 = 0;
+    	        			    	for (int i = posicion_echo[j+1] + 1; i < (posicion_echo[j+2]-1); i++){
+    	        			    		NMEA_data.NMEA_GNRMC[i3]= tx_buf[i];
+    	        			    	    i3++;
+    	        			    	}
+    	        			    	i3 = 0;
+    	        			    	for (int i = posicion_echo[j+2] + 1; i < (posicion_echo[j+2]+39); i++){
+    	        			    		NMEA_data.NMEA_GNVTG[i3]= tx_buf[i];
+    	        			    		i3++;
+    	        			    	}
     	        			    }
     	        			}
 
@@ -739,7 +652,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
     	        			ESP_LOGI(TAG1,"GNVTG es: %s\r\n",NMEA_data.NMEA_GNVTG);*/
 
-
+    	        		//	NMEA_data2 = NMEA_separator(&NMEA_data2, auxc2_echo,len);
     	        		//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
     	        		//	GPS_parsing(NMEA_data.NMEA_GNGGA, gps_data);
 
@@ -754,7 +667,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        					primera_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     	        					gps_data.ronda = 0;
-    	        					bzero(NMEA_data.NMEA_GNRMC,BUF_SIZE);
+    	        					bzero(NMEA_data.NMEA_GNRMC,256);
     	        					len7 = 0;
     	        					prom_lat = 0;
     	        					prom_lon = 0;

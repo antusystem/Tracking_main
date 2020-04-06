@@ -13,21 +13,13 @@ static const char *TAG2 = "GPS_Parsing";
 
 
 typedef struct {
-    char NMEA_GNGGA[BUF_SIZE];
-    char NMEA_GPGSA[BUF_SIZE];
-    char NMEA_BDGSA[BUF_SIZE];
-    char NMEA_GPGSV1[BUF_SIZE];
-    char NMEA_GPGSV2[BUF_SIZE];
-    char NMEA_GPGSV3[BUF_SIZE];
-    char NMEA_GPGSV4[BUF_SIZE];
-    char NMEA_GPGSV5[BUF_SIZE];
-    char NMEA_GPGSV6[BUF_SIZE];
-    char NMEA_GPGSV7[BUF_SIZE];
-    char NMEA_GPGSV8[BUF_SIZE];
-    char NMEA_GPGSV9[BUF_SIZE];
-    char NMEA_BDGSV[BUF_SIZE];
-    char NMEA_GNRMC[BUF_SIZE];
-    char NMEA_GNVTG[BUF_SIZE];
+    char NMEA_GNGGA[256];
+    char NMEA_GPGSA[256];
+    char NMEA_BDGSA[256];
+    char NMEA_GPGSV1[256];
+    char NMEA_BDGSV[256];
+    char NMEA_GNRMC[256];
+    char NMEA_GNVTG[];
 } NMEA_data_t;
 
 typedef enum
@@ -109,7 +101,7 @@ typedef struct {
 
 
 
-gps_data_t gps_data;
+
 
 void echo_task(void *P);
 

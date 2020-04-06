@@ -284,10 +284,10 @@ void Mandar_mensaje2(void *P)
             led_gsm = 1;
     	}
 
-    	ESP_LOGI(TAG, "La latitud prom es: %f", gps_data.latitude_prom);
+  /*  	ESP_LOGI(TAG, "La latitud prom es: %f", gps_data.latitude_prom);
     	ESP_LOGI(TAG, "La latitud dir es: %s", gps_data.latitude_direct);
         ESP_LOGI(TAG, "La longitud prom es: %f", gps_data.longitude_prom);
-      	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);
+      	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);*/
 
     /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
@@ -309,9 +309,9 @@ void Mandar_mensaje2(void *P)
     switch (puerta_b){
     case 0:
     // Verifico si no hubo error al conectarse a al modulo GPS
-        if (gps_data.error_gps == 0){
+        if (gps_data2.error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-        	if (gps_data.year == 20){
+        	if (gps_data2.year == 20){
 
         		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
         		ESP_LOGI(TAG, "[%s] ", message);
@@ -323,16 +323,16 @@ void Mandar_mensaje2(void *P)
 			ESP_LOGI(TAG, "[%s] ", message);
         	}
         } else{
-        	gps_data.error_gps = 0;
+        	gps_data2.error_gps = 0;
     		sprintf(message,"No se logro conectar con el modulo GPS.");
     		ESP_LOGI(TAG, "[%s] ", message);
         }
     break;
     case 1:
     	// Verifico si no hubo error al conectarse a al modulo GPS
-    	if (gps_data.error_gps == 0){
+    	if (gps_data2.error_gps == 0){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-    		if (gps_data.year == 20){
+    		if (gps_data2.year == 20){
 
     			sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
 			ESP_LOGI(TAG, "[%s] ", message);
@@ -353,7 +353,7 @@ void Mandar_mensaje2(void *P)
     			}
     	    }
     	} else{
-			gps_data.error_gps = 0;
+			gps_data2.error_gps = 0;
 
 			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
 			ESP_LOGI(TAG, "[%s] ", message);
@@ -371,6 +371,31 @@ void Mandar_mensaje2(void *P)
 void app_main(void)
 {
 	nvs_flash_init();
+
+
+	//Se inicia la tarea configurando los Uart 0 y Uart 2
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+    ESP_LOGI("main", "Empezar a configurar Uart 0");
+    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_0, &uart_config);
+    uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    ESP_LOGI("main", "Uart 0 Iniciado");
+    ESP_LOGI("main", "Empezar a configurar Uart 2");
+
+    uart_param_config(UART_NUM_2, &uart_config);
+    uart_set_pin(UART_NUM_2, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS);
+    uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
+
+
+
 
 	/*Configurar inicio del SIM800l*/
 	/*Poner los pines como GPIO*/
@@ -398,7 +423,7 @@ void app_main(void)
 
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 6, NULL,0);
-	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*7, NULL, 6, NULL,1);
+	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*10, NULL, 6, NULL,1);
 	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 8, NULL,0);
 
 //	xEventGroupSetBits(event_group, BEGIN_TASK2);

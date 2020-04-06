@@ -23,6 +23,11 @@
 
 #include "NMEA_setting.h"
 
+#define ECHO_TEST_TXD  (GPIO_NUM_18)
+#define ECHO_TEST_RXD  (GPIO_NUM_5)
+#define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
+#define ECHO_TEST_CTS  (UART_PIN_NO_CHANGE)
+
 
 
 char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
@@ -36,18 +41,27 @@ char auxc5_echo[1] = "$";
 char auxc7_echo[1] = "B";
 
 
-
 //Variables globales para calcular promedios en varias funciones
 float prom_lon = 0;
 float prom_lat = 0;
 
 
 
+NMEA_data_t NMEA_data;
+//NMEA_data_t NMEA_data2;
 
-#define ECHO_TEST_TXD  (GPIO_NUM_18)
-#define ECHO_TEST_RXD  (GPIO_NUM_5)
-#define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
-#define ECHO_TEST_CTS  (UART_PIN_NO_CHANGE)
+//Se definen auxiliares
+uint8_t auxi1_echo = 0, auxi2_echo = 0;
+
+
+//posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
+uint16_t posicion_echo[13] = {0};
+
+//Para saber si es la primera vez que mando AT + GPS = 1
+uint8_t primera_vuelta = 0;
+
+
+
 uint16_t len = 0;
 
 //Para usar gestion de eventos
@@ -405,20 +419,31 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
   void echo_task(void *arg)
 {
 
-    gps_data_t gps_data;
+		//Se inicia la tarea configurando los Uart 0 y Uart 2
+	    uart_config_t uart_config = {
+	        .baud_rate = 115200,
+	        .data_bits = UART_DATA_8_BITS,
+	        .parity    = UART_PARITY_DISABLE,
+	        .stop_bits = UART_STOP_BITS_1,
+	        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+	        .source_clk = UART_SCLK_APB,
+	    };
+	    ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
+	    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
+	    uart_param_config(UART_NUM_0, &uart_config);
+	    uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, ECHO_TEST_RTS, ECHO_TEST_CTS);
 
-    NMEA_data_t NMEA_data;
-    //NMEA_data_t NMEA_data2;
+	    ESP_LOGI(TAG1, "Uart 0 Iniciado");
+	    ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
 
-    //Se definen auxiliares
-    uint8_t auxi1_echo = 0, auxi2_echo = 0;
+	    uart_param_config(UART_NUM_2, &uart_config);
+	    uart_set_pin(UART_NUM_2, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS);
+	    uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
 
 
-    //posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
-    uint16_t posicion_echo[13] = {0};
+	    ESP_LOGI(TAG1, "Uart 2 Iniciado");
 
-    //Para saber si es la primera vez que mando AT + GPS = 1
-    uint8_t primera_vuelta = 0;
+
 
     //Se declara la variable que copiara lo que llegue al buffer
     //uint8_t *data = (uint8_t *) malloc(BUF_SIZE);

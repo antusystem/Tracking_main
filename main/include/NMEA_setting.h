@@ -101,7 +101,7 @@ typedef struct {
 
 
 
-
+gps_data_t gps_data;
 
 void echo_task(void *P);
 

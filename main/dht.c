@@ -360,8 +360,8 @@ void TareaDHT(void *P){
         if (sirve == 0 && vuelta_temp >=10){
         	vuelta_temp = 0;
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
-        	xEventGroupSetBits(event_group, BEGIN_TASK2);
-        	xEventGroupClearBits(event_group, BEGIN_TASK1);
+        //	xEventGroupSetBits(event_group, BEGIN_TASK2);
+        //	xEventGroupClearBits(event_group, BEGIN_TASK1);
     		break;
         }
         }

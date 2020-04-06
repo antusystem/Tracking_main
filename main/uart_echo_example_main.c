@@ -644,8 +644,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			   len5 = 0;
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
-    	        		       ESP_LOGI(TAG1, "2- Esperare 50 segundos \r\n");
-    	        		       vTaskDelay(pdMS_TO_TICKS(3000));
+    	        		       ESP_LOGI(TAG1, "2- Esperare 30 segundos \r\n");
+    	        		       vTaskDelay(pdMS_TO_TICKS(30000));
     	        			}
     	        		} else {
     	        			if (strncmp(auxc2_echo,"AT\r\n\r\nOK\r\n",10) == 0){
@@ -741,13 +741,14 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
     	        	//		gps_data = RMC_parsing(NMEA_data.NMEA_GNRMC, &gps_data, ronda);
     	        			xQueueOverwrite(xQueue_gps,&gps_data);
+    	        			bzero(NMEA_data.NMEA_GNRMC,256);
 
     	        			if (primera_vuelta == 0){
     	        				if (gps_data.ronda == 10 ){
     	        					primera_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     	        					gps_data.ronda = 0;
-    	        					bzero(NMEA_data.NMEA_GNRMC,256);
+    	        				//	bzero(NMEA_data.NMEA_GNRMC,256);
     	        					len7 = 0;
     	        					prom_lat = 0;
     	        					prom_lon = 0;
@@ -756,14 +757,14 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        					//Para detener el envio de datos del GPS se manda lo siguiente
     	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
     	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
-    	        					xEventGroupClearBits(event_group, BEGIN_TASK2);
+    	        				//	xEventGroupClearBits(event_group, BEGIN_TASK2);
     	        				}
     	        			}
 
 	        				if (gps_data.ronda == 30 ){
 	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
 	        					gps_data.ronda = 0;
-	        					bzero(NMEA_data.NMEA_GNRMC,256);
+	        				//	bzero(NMEA_data.NMEA_GNRMC,256);
 	        					len7 = 0;
 	        					prom_lat = 0;
 	        					prom_lon = 0;
@@ -772,7 +773,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 	        					//Para detener el envio de datos del GPS se manda lo siguiente
 	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
 	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
-	        					xEventGroupClearBits(event_group, BEGIN_TASK2);
+	        				//	xEventGroupClearBits(event_group, BEGIN_TASK2);
 	        				}
 
     	        		    break;

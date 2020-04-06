@@ -47,10 +47,10 @@ typedef enum
 } NMEA_sentences;
 
 typedef struct {
-    float latitude[10];                                                /*!< Latitude (degrees) */
+    float latitude[41];                                                /*!< Latitude (degrees) */
     float latitude_prom;
     char latitude_direct[20];
-    float longitude[10];                                               /*!< Longitude (degrees) */
+    float longitude[41];                                               /*!< Longitude (degrees) */
     float longitude_prom;
     char longitude_direct[20];
     float altitude;                                                /*!< Altitude (meters) */

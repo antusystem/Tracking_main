@@ -761,7 +761,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        				}
     	        			}
 
-	        				if (gps_data.ronda == 30 ){
+	        				if (gps_data.ronda == 40 ){
 	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
 	        					gps_data.ronda = 0;
 	        				//	bzero(NMEA_data.NMEA_GNRMC,256);

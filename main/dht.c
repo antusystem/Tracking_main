@@ -334,8 +334,8 @@ void TareaDHT(void *P){
             }
        //     ESP_LOGI("Sensor_AM2301","Prom hum es: %f", prom_hum);
        //     ESP_LOGI("Sensor_AM2301","Prom temp es: %f", prom_temp);
-            Thum.Prom_hum[Thum.pos_temp] = prom_hum/16;
-            Thum.Prom_temp[Thum.pos_temp] = prom_temp/16;
+            Thum.Prom_hum[Thum.pos_temp] = prom_hum/10;
+            Thum.Prom_temp[Thum.pos_temp] = prom_temp/10;
             prom_hum =  0.0;
             prom_temp = 0.0;
         	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",Thum.Prom_hum[Thum.pos_temp]);
@@ -357,7 +357,7 @@ void TareaDHT(void *P){
             }
         }
 
-        if (sirve == 0 && vuelta_temp >=4){
+        if (sirve == 0 && vuelta_temp >=10){
         	vuelta_temp = 0;
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
         	xEventGroupSetBits(event_group, BEGIN_TASK2);

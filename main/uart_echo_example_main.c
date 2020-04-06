@@ -28,21 +28,21 @@ NMEA_data_t NMEA_data;
 //Se definen auxiliares
 uint8_t auxi1_echo = 0, auxi2_echo = 0;
 
-char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
+//char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
 //El siguiente auxiliar se usa para tener otra variable con los datos que llegan al buffer de recepcion
 char auxc2_echo[BUF_SIZE] = "";
-char auxc3_echo[] = "AT+GPS=1\r\nOK\r\n";
-char auxc4_echo[] = "AT+GPSRD=1\r\nOK\r\n";
+//char auxc3_echo[] = "AT+GPS=1\r\nOK\r\n";
+//char auxc4_echo[] = "AT+GPSRD=1\r\nOK\r\n";
 //Los siguientes dos char se ponen ya que no queria agarrarlo la parte donde se usa
 //a pesar de usar comillas simples
-char auxc5_echo[1] = "$";
-char auxc7_echo[1] = "B";
+//char auxc5_echo[1] = "$";
+//char auxc7_echo[1] = "B";
 
 
 
 
 //posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
-uint16_t posicion_echo[13] = {0};
+//uint16_t posicion_echo[13] = {0};
 
 //Variables globales para calcular promedios en varias funciones
 float prom_lon = 0;
@@ -521,15 +521,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     uint8_t * ronda =  malloc(sizeof( uint8_t));
     *ronda = 0;*/
 
-
-    // Se definen los comandos AT que seran enviados con su longitud y un auxiliar
-    // Se ignoraron ya que puede ponerse directamente en la funcion
-/*  char *com = {"AT\r\n"};
-    int len2 =  4;
-    char *com2 = "AT+GPS=1\r\n";
-    int len4 = 10;
-    char *com3 = "AT+GPSRD=1\r\n";
-    int len6 = 12;*/
+    //Para encontrar la posicion de los $ en la oracion NMEA
+    uint16_t posicion_echo[13] = {0};
 
     uint8_t len3 = 0;
     uint8_t len5 = 0;
@@ -626,7 +619,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        	switch (auxi1_echo){
     	        	case 0:
     	        		//En el caso 0 verifica si respondio AT OK
-    	        		if (strncmp(auxc2_echo,auxc1_echo,10) == 0){
+    	        		if (strncmp(auxc2_echo,"AT\r\n\r\nOK\r\n",10) == 0){
     	        			ESP_LOGI(TAG1, "1- Respondio AT OK \r\n");
     	         	        auxi1_echo++;
     	         	        len3 = 0;
@@ -646,7 +639,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        	case 1:
     	        		gps_data.ronda_error = 0;
     	        		if (primera_vuelta == 0){
-    	        			if (strncmp(auxc2_echo,auxc3_echo,10) == 0){
+    	        			if (strncmp(auxc2_echo,"AT+GPS=1\r\nOK\r\n",10) == 0){
     	        			   auxi1_echo++;
     	        			   len5 = 0;
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
@@ -655,7 +648,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        		       vTaskDelay(pdMS_TO_TICKS(3000));
     	        			}
     	        		} else {
-    	        			if (strncmp(auxc2_echo,auxc1_echo,10) == 0){
+    	        			if (strncmp(auxc2_echo,"AT\r\n\r\nOK\r\n",10) == 0){
 	        		    	auxi1_echo++;
 	        		    	len5 = 0;
 	        				}
@@ -679,7 +672,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			int i2 = 0;
     	        			//En este for escanea el buffer por la posicion de $
     	        			for (uint16_t i = 0; i < len; i++){
-    	        				if (auxc2_echo[i] == auxc5_echo[0] ){
+    	        				if (auxc2_echo[i] == '$' ){
     	        						posicion_echo[i2] = i;
     	        						/*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
     	        						ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
@@ -715,7 +708,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			    //j = 4 porque se ve de las siguientes oraciones donde esta la B
     	        			    //para empezar a guardar
     	        			    i3 = 0;
-    	        			    if (tx_buf[posicion_echo[j]+1] == auxc7_echo[0]){
+    	        			    if (tx_buf[posicion_echo[j]+1] == 'B'){
     	        			        for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
     	        			        	NMEA_data.NMEA_BDGSV[i3]= tx_buf[i];
     	        			        	i3++;
@@ -754,7 +747,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        					primera_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     	        					gps_data.ronda = 0;
-    	        					bzero(NMEA_data.NMEA_GNRMC,BUF_SIZE);
+    	        					bzero(NMEA_data.NMEA_GNRMC,256);
     	        					len7 = 0;
     	        					prom_lat = 0;
     	        					prom_lon = 0;
@@ -767,9 +760,10 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        				}
     	        			}
 
-	        				if (gps_data.ronda == 40 ){
+	        				if (gps_data.ronda == 30 ){
 	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
 	        					gps_data.ronda = 0;
+	        					bzero(NMEA_data.NMEA_GNRMC,256);
 	        					len7 = 0;
 	        					prom_lat = 0;
 	        					prom_lon = 0;
@@ -778,6 +772,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 	        					//Para detener el envio de datos del GPS se manda lo siguiente
 	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
 	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+	        					xEventGroupClearBits(event_group, BEGIN_TASK2);
 	        				}
 
     	        		    break;

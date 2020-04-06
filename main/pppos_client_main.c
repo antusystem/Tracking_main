@@ -398,9 +398,9 @@ void app_main(void)
 
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 6, NULL,0);
-	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*7, NULL, 6, NULL,1);
+	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 6, NULL,1);
 	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 8, NULL,0);
-
+//	La tarea dht se inicia en sync desde mandar mensaje
 //	xEventGroupSetBits(event_group, BEGIN_TASK2);
 
 

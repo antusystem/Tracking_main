@@ -23,6 +23,7 @@
 #include "bg96.h"
 #include "nvs_flash.h"
 #include "freertos/queue.h"
+#include "tracking.h"
 
 
 
@@ -74,9 +75,13 @@ const int GOT_DATA_BIT = BIT2;
   const int SYNC_BIT_TASK2 = BIT7;
 
 //Para conocer el estado de la puerta
+  //puerta a es el estado actual de la puerta, puerta b es para saber si se abrio y cambia si se cerro
+  //despues de mandar el mensaje, puerta c es para saltar a mandar el mensaje inmediatamente pero solo
+  //cuando se abre la puerta, si se mantiene abierta esperara el ciclo normal del programa
 uint8_t puerta_a = 0;
-uint8_t puerta_b = 0;
+//uint8_t puerta_b = 0;
 uint8_t puerta_c = 0;
+e_Puerta puerta_b = 0;
 
 #if CONFIG_EXAMPLE_SEND_MSG
 /**
@@ -284,14 +289,9 @@ void Mandar_mensaje2(void *P)
             led_gsm = 1;
     	}
 
-    	ESP_LOGI(TAG, "La latitud prom es: %f", gps_data.latitude_prom);
-    	ESP_LOGI(TAG, "La latitud dir es: %s", gps_data.latitude_direct);
-        ESP_LOGI(TAG, "La longitud prom es: %f", gps_data.longitude_prom);
-      	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);
-
     /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
-     * */
+      */
     xQueueReceive(xQueue_temp,&Thum2,portMAX_DELAY);
 
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
@@ -307,11 +307,11 @@ void Mandar_mensaje2(void *P)
     xQueueReceive(xQueue_gps,&gps_data2,portMAX_DELAY);
 
     switch (puerta_b){
-    case 0:
+    case P_cerrada:
     // Verifico si no hubo error al conectarse a al modulo GPS
-        if (gps_data.error_gps == 0){
+        if (gps_data2.error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-        	if (gps_data.year == 20){
+        	if (gps_data2.year == 20){
 
         		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
         		ESP_LOGI(TAG, "[%s] ", message);
@@ -323,16 +323,16 @@ void Mandar_mensaje2(void *P)
 			ESP_LOGI(TAG, "[%s] ", message);
         	}
         } else{
-        	gps_data.error_gps = 0;
+        	gps_data2.error_gps = 0;
     		sprintf(message,"No se logro conectar con el modulo GPS.");
     		ESP_LOGI(TAG, "[%s] ", message);
         }
     break;
-    case 1:
+    case P_abierta:
     	// Verifico si no hubo error al conectarse a al modulo GPS
-    	if (gps_data.error_gps == 0){
+    	if (gps_data2.error_gps == 0){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-    		if (gps_data.year == 20){
+    		if (gps_data2.year == 20){
 
     			sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
 			ESP_LOGI(TAG, "[%s] ", message);
@@ -370,6 +370,7 @@ void Mandar_mensaje2(void *P)
 
 void app_main(void)
 {
+
 	nvs_flash_init();
 
 	/*Configurar inicio del SIM800l*/
@@ -399,7 +400,7 @@ void app_main(void)
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 5, NULL,0);
 	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 5, NULL,0);
-	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 5, NULL,0);
+	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 6, NULL,0);
 //	La tarea dht se inicia en sync desde mandar mensaje
 	xEventGroupSetBits(event_group, BEGIN_TASK2);
 
@@ -410,14 +411,14 @@ void app_main(void)
 		//puerta_a sirve para saber si la puerta esta abierta o cerrada en todo momento
 		//puerta_b se usa para tener una referencia de cuando la puerta se abrio y no repetir
 		//el uso de las tareas
-		if (gpio_get_level(GPIO_NUM_14) == 1){
+		if (gpio_get_level(GPIO_NUM_14) == 0){
 			vTaskDelay(200 / portTICK_PERIOD_MS);
 			puerta_a = 1;
 			if (puerta_b == 0){
 				puerta_b = 1;
 			}
 		}
-		if (gpio_get_level(GPIO_NUM_14) == 0){
+		if (gpio_get_level(GPIO_NUM_14) == 1){
 			vTaskDelay(200 / portTICK_PERIOD_MS);
 			puerta_a = 0;
 		}

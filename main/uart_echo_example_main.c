@@ -94,7 +94,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	char* coma = ",";
 	//Para contar cuantas veces se guardan los datos se aumenta la cantidad de ronda
 	GPS_data->ronda++;
-//	GPS_data->stage++;
+	GPS_data->stage = 0;
 
 
 
@@ -107,8 +107,9 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	}
 
 	for (int k1 = 0; k1 < 9; k1++){
-		switch (k1){
-		case 0:
+		GPS_data->stage = k1;
+		switch (GPS_data->stage){
+		case time_UTC:
 
 			strncpy(rmc_data.time_UTC,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
 			rmc_data.time_UTC[10] = 0x00;
@@ -152,7 +153,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 
 		break;
-		case 1:
+		case active:
 		//	l1 = 0;
 			strncpy(rmc_data.active,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.active[1] = 0x00;
@@ -161,7 +162,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		//	ESP_LOGI(TAG2,"El estado es: %s\r\n",GPS_data->estado);
 
 		break;
-		case 2:
+		case latitude:
 	//		l1 = 0;
 			strncpy(rmc_data.latitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 	//		l1 = strlen(rmc_data.latitude);
@@ -202,7 +203,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	//		GPS_data->latitude_prom = prom_lat/10;
 	//		ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
 		break;
-		case 3:
+		case latitude_dir:
 			strncpy(rmc_data.latitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.latitude_dir[2] = 0x00;
 
@@ -213,7 +214,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			}
 		//	ESP_LOGI(TAG2,"La direccion de la latitud es: %s\r\n",GPS_data->latitude_direct);
 		break;
-		case 4:
+		case longitude:
 //			l1 = 0;
 			strncpy(rmc_data.longitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 //			l1 = strlen(rmc_data.longitude);
@@ -252,7 +253,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 
 		break;
-		case 5:
+		case longitude_dir:
 
 			strncpy(rmc_data.longitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.longitude[1] = 0x00;
@@ -265,7 +266,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			}
 	//		ESP_LOGI(TAG2,"La direccion de la longitud es: %s\r\n",GPS_data->longitude_direct);
 		break;
-		case 6:
+		case speed:
 			strncpy(rmc_data.speed,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.speed[5] = 0x00;
 		//	ESP_LOGI(TAG2,"La velocidad es: %s\r\n",rmc_data.speed);
@@ -274,7 +275,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		//	ESP_LOGI(TAG2,"La velocidad es: %f\r\n",GPS_data->speed);
 
 		break;
-		case 7:
+		case track:
 
 			strncpy(rmc_data.track,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.track[4] = 0x00;
@@ -284,7 +285,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	//		GPS_data->track = atof(rmc_data.speed);
 	//		ESP_LOGI(TAG2,"La velocidad es: %s\r\n",GPS_data->track);
 		break;
-		case 8:	//		l1 = 0;
+		case date:	//		l1 = 0;
 			strncpy(rmc_data.date,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.date[6] = 0x00;
 	//		ESP_LOGI(TAG2,"La fecha es: %s\r\n",rmc_data.date);
@@ -572,7 +573,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
 
     	     	//Mostrar auxc2
-    	     	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
+    	    // 	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
     	     	//printf(" Copio el buffer, auxc2 es: %s",auxc2)
     	 //    	ESP_LOGI(TAG1, " Ya termino auxc2");
 
@@ -709,6 +710,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
     	        			xQueueOverwrite(xQueue_gps,&gps_data);
     	        			bzero(NMEA_data.NMEA_GNRMC,256);
+    	        			gps_data.stage = 0;
 
     	        			if (primera_vuelta == 0){
     	        				if (gps_data.ronda == 10 ){

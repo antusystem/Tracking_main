@@ -24,7 +24,8 @@
 #include "nvs_flash.h"
 #include "freertos/queue.h"
 #include "tracking.h"
-
+#include "esp_sleep.h"
+#include "driver/rtc_io.h"
 
 
 

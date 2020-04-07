@@ -51,6 +51,11 @@
 QueueHandle_t xQueue_temp;
 QueueHandle_t xQueue_gps;
 
+//Para el limite de la temperatura
+uint8_t limite_a =0;
+uint8_t limite_b =0;
+uint8_t limite_c = 0;
+
 
 
 
@@ -82,6 +87,11 @@ uint8_t puerta_a = 0;
 //uint8_t puerta_b = 0;
 uint8_t puerta_c = 0;
 e_Puerta puerta_b = 0;
+
+
+
+
+
 
 #if CONFIG_EXAMPLE_SEND_MSG
 /**
@@ -272,6 +282,7 @@ void Mandar_mensaje2(void *P)
 	uint8_t  led_gsm = 0;
 	gps_data_t gps_data2;
 	AM2301_data_t Thum2;
+	message_data_t message_data;
 
 
 	printf("Entre en mandar mensaje \r\n");
@@ -293,18 +304,37 @@ void Mandar_mensaje2(void *P)
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
       */
     xQueueReceive(xQueue_temp,&Thum2,portMAX_DELAY);
-
+    printf ("hola \r\n");
+	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
+	sprintf(message_data.Temperatura, "%f",Thum2.Prom_temp[Thum2.pos_temp-1]);
+	printf ("hola \r\n");
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
-    if (Thum.error_temp == 0){
-    	sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-    	ESP_LOGI(TAG, "[%s]", message);
-    } else {
+	 if (Thum.error_temp == 0){
+		 switch(limite_b){
+		 case 0:
+		    	sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+		    	ESP_LOGI(TAG, "[%s]", message);
+		 break;
+		 case 1:
+		    sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+		    ESP_LOGI(TAG, "[%s]", message);
+		    if (limite_a == 0){
+		    	limite_b = 0;
+		    }
+	     break;
+		 }
+	 } else {
     	Thum.error_temp = 0;
     	sprintf(message,"No se logro medir la temperatura. Revisar las conexiones.");
     	ESP_LOGI(TAG, "[%s] ", message);
     }
 
+	 printf ("hola 1 \r\n");
+
     xQueueReceive(xQueue_gps,&gps_data2,portMAX_DELAY);
+    sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
+    sprintf(message_data.Longitude, "%f",gps_data2.latitude_prom);
+
 
     switch (puerta_b){
     case P_cerrada:

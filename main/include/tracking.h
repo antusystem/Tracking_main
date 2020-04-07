@@ -15,6 +15,16 @@ typedef enum
 } e_Puerta;
 
 
+typedef struct {
+    char Latitude[319];
+    char Longitude[319];
+    char Latitude_dir[10];
+    char Longitude_dir[10];/*!< Longitude (degrees) */
+    char Humedad[319];
+    char Temperatura[319];
+
+} message_data_t;
+
 
 
 #endif /* MAIN_INCLUDE_TRACKING_H_ */

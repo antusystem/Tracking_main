@@ -612,8 +612,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			   len5 = 0;
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
-    	        		       ESP_LOGI(TAG1, "2- Esperare 40 segundos \r\n");
-    	        		       vTaskDelay(pdMS_TO_TICKS(40000));
+    	        		       ESP_LOGI(TAG1, "2- Esperare 30 segundos \r\n");
+    	        		       vTaskDelay(pdMS_TO_TICKS(30000));
     	        			}
     	        		} else {
     	        			if (strncmp(auxc2_echo,"AT\r\n\r\nOK\r\n",10) == 0){

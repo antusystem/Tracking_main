@@ -15,6 +15,8 @@
 #define numDHT_bits 40
 #define numDHT_bytes 5
 #define DHTpin 19
+#define Temp_up 29
+#define Temp_down 26
 
 
 extern EventGroupHandle_t event_group;
@@ -23,19 +25,23 @@ extern QueueHandle_t xQueue_temp;
 
 extern const int BEGIN_TASK1;
 
-extern const int BEGIN_TASK2;
-
 extern const int SYNC_BIT_TASK1;
+
+extern const int SYNC_BIT_TASK2;
 /*
 extern const int BEGIN_TASK2;
 
 extern const int BEGIN_TASK3;*/
 
+//Para los limites de la temperatura
+extern uint8_t limite_a;
+extern uint8_t limite_b;
+extern uint8_t limite_c;
 
 
 const char *nvs_tag = "NVS";
 struct form_home *form2;
-
+/*
 //Escribir en la memoria flash
 void set_form_flash_init( AM2301_data_t Thum){
 	esp_err_t err;
@@ -61,8 +67,8 @@ void set_form_flash_init( AM2301_data_t Thum){
 	}
 	nvs_close(ctrl_flash);
 
-}
-
+}*/
+/*
 //Leer la memoria flash
 void get_form_flash( AM2301_data_t *Thum){
 	size_t len;
@@ -157,7 +163,7 @@ void get_form_flash( AM2301_data_t *Thum){
 	}
 	nvs_close(ctrl_flash);
 }
-
+*/
 
 
 
@@ -233,11 +239,12 @@ void TareaDHT(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
-    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0;
+    uint8_t humedad = 0, decimal_hum = 0, sirve = 0, vuelta_temp = 0, limite_d = 0;
     uint16_t auxi1 = 0, auxi2 = 0;
     char auxc1[54] = "", auxc2[54] = "";
     int auxi3 = 0, auxi4 = 0;
     float prom_temp = 0, prom_hum = 0;
+
 
     //Para saber la posicion en que estoy dentro del arreglo de promedios de temp y hum
     Thum.pos_temp = 0;
@@ -358,12 +365,25 @@ void TareaDHT(void *P){
         }
 
         if (sirve == 0 && vuelta_temp >=16){
+        	limite_d = 1;
         	vuelta_temp = 0;
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
         //	xEventGroupSetBits(event_group, BEGIN_TASK2);
         //	xEventGroupClearBits(event_group, BEGIN_TASK1);
     		break;
         }
+        //Verifico si la temperatura esta dentro de los limites aceptables
+        if (limite_d == 1){
+        	if (Thum.Prom_temp[Thum.pos_temp-1] > Temp_up || Thum.Prom_temp[Thum.pos_temp] < Temp_down){
+        		limite_a = 1;
+        		if (limite_b == 0){
+        			limite_b = 1;
+        		}
+        	} else{
+        	limite_a = 0;
+        	}
+        }
+
         }
     }
 }

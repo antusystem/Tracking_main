@@ -50,6 +50,7 @@ float prom_lat = 0;
 
 //Para saber si es la primera vez que mando AT + GPS = 1
 uint8_t primera_vuelta = 0;
+uint8_t segunda_vuelta = 0;
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
@@ -64,7 +65,6 @@ extern EventGroupHandle_t event_group;
 extern const int BEGIN_TASK2;
 
 extern const int SYNC_BIT_TASK2;
-
 
 
 //Para la cola
@@ -345,6 +345,110 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 				break;
 				}
 
+				if (GPS_data->hour == 20 || GPS_data->hour == 21 || GPS_data->hour == 22 || GPS_data->hour == 23){
+					switch (GPS_data->month){
+					case 1:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Diciembre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 2:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Enero");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 3:
+						//No se toma en cuenta el a;o biciesto
+						if ( GPS_data->day == 1){
+							GPS_data->day = 28;
+							if (GPS_data->year == 24 || GPS_data == 28){
+								GPS_data->day = 29;
+							}
+							strcpy(GPS_data->mes,"Febrero");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 4:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Marzo");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 5:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Abril");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 6:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Mayo");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 7:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Junio");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 8:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Julio");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 9:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Agosto");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 10:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Septiembre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 11:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Octubre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 12:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Noviembre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					}
+				}
 			//	ESP_LOGI(TAG2,"La fecha es %d-%d-%d \r\n",GPS_data->day,GPS_data->month,GPS_data->year);
 			//	ESP_LOGI(TAG2,"La fecha es %d de %s del 20%d \r\n",GPS_data->day,GPS_data->mes,GPS_data->year);
 		break;
@@ -505,6 +609,12 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     		uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
     	}
 
+    	if  (primera_vuelta == 0){
+    		primera_vuelta = 1;
+    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+    		len = 0;
+    	}
+
     	//Se debe limpiar tx_buf para borrar lo de la ronda anterior
    // 	ESP_LOGI(TAG1, "Limpiare tx_buf");
     	bzero(tx_buf,BUF_SIZE);
@@ -520,13 +630,12 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 	    break;
     	case 1:
     		//En la segunda vuelta activa el GPS
-    		if (primera_vuelta == 0){
+    		if (segunda_vuelta == 0){
         		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
         		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
     		} else {
     			//Si ya no es la primera vuelta entonces hago esto para que entre en el siguiente if
     			len5 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
-    			ESP_LOGI(TAG1, "Len5 es 2\r\n");
     		}
     	break;
     	case 2:
@@ -591,7 +700,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			ESP_LOGI(TAG1, "1- Respondio AT OK \r\n");
     	         	        auxi1_echo++;
     	         	        len3 = 0;
-    	         	       gps_data.ronda_error = 0;
+    	         	        gps_data.ronda_error = 0;
     	         	    } else {
      	        	    	ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
      	        	    	gps_data.ronda_error++;
@@ -600,27 +709,55 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
      	        	    		gps_data.ronda_error = 0;
      	        	    		gps_data.error_gps = 1;
      	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+     	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+     	        	    		len = 0;
      	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
      	        	    	}
      	        	    }
     	        		break;
     	        	case 1:
     	        		gps_data.ronda_error = 0;
-    	        		if (primera_vuelta == 0){
+    	        		if (segunda_vuelta == 0){
     	        			if (strncmp(auxc2_echo,"AT+GPS=1\r\nOK\r\n",10) == 0){
     	        			   auxi1_echo++;
+    	        			   gps_data.ronda_error = 0;
     	        			   len5 = 0;
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
     	        		       ESP_LOGI(TAG1, "2- Esperare 30 segundos \r\n");
     	        		       vTaskDelay(pdMS_TO_TICKS(30000));
+    	        			}else {
+         	        	    	ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 \r\n");
+         	        	    	gps_data.ronda_error++;
+         	        	    	if (gps_data.ronda_error >= 15){
+         	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+         	        	    		gps_data.ronda_error = 0;
+         	        	    		gps_data.error_gps = 1;
+         	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+         	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+         	        	    		len = 0;
+         	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+         	        	    	}
     	        			}
+
     	        		} else {
     	        			if (strncmp(auxc2_echo,"AT\r\n\r\nOK\r\n",10) == 0){
 	        		    	auxi1_echo++;
 	        		    	len5 = 0;
-	        				}
+	        				}else {
+         	        	    	ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 \r\n");
+         	        	    	gps_data.ronda_error++;
+         	        	    	if (gps_data.ronda_error >= 15){
+         	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+         	        	    		gps_data.ronda_error = 0;
+         	        	    		gps_data.error_gps = 1;
+         	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+         	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+         	        	    		len = 0;
+         	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+         	        	    	}
 	        			}
+    	        		}
     	        		break;
     	        		//Este caso causa molestia de vez en cuando y aparte no es necesario
     	        		//para verificar si llegan los datos
@@ -712,9 +849,9 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			bzero(NMEA_data.NMEA_GNRMC,256);
     	        			gps_data.stage = 0;
 
-    	        			if (primera_vuelta == 0){
+    	        			if (segunda_vuelta == 0){
     	        				if (gps_data.ronda == 10 ){
-    	        					primera_vuelta = 1;
+    	        					segunda_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     	        					gps_data.ronda = 0;
     	        				//	bzero(NMEA_data.NMEA_GNRMC,256);
@@ -775,6 +912,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     			gps_data.error_gps = 1;
     			xQueueOverwrite(xQueue_gps,&gps_data);
     			ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+        		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+        		len = 0;
     			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     		}
 

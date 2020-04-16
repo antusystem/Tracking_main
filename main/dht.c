@@ -1,5 +1,5 @@
+
 #include "dht.h"
-// Inclusion de librerias -------------------------------------------
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -10,13 +10,12 @@
 #include "nvs_flash.h"
 #include "freertos/semphr.h"
 
-// Definiciones -----------------------------------------------------
+// Definiciones
 #define us_retardo 1
 #define numDHT_bits 40
 #define numDHT_bytes 5
 #define DHTpin 19
-#define Temp_up 29
-#define Temp_down 26
+
 
 
 extern EventGroupHandle_t event_group;
@@ -41,6 +40,9 @@ extern uint8_t limite_c;
 
 const char *nvs_tag = "NVS";
 struct form_home *form2;
+
+const uint8_t Temp_up = 29;
+const uint8_t Temp_down = 26;
 /*
 //Escribir en la memoria flash
 void set_form_flash_init( AM2301_data_t Thum){

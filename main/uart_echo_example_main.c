@@ -732,6 +732,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
          	        	    	if (gps_data.ronda_error >= 15){
          	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
          	        	    		gps_data.ronda_error = 0;
+         	        	    		auxi1_echo = 0;
          	        	    		gps_data.error_gps = 1;
          	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
          	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
@@ -751,6 +752,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
          	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
          	        	    		gps_data.ronda_error = 0;
          	        	    		gps_data.error_gps = 1;
+         	        	    		auxi1_echo = 0;
          	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
          	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
          	        	    		len = 0;
@@ -890,10 +892,10 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        		}
     	        	}
 
-    	        	if (parar_RD1 == 1){
+    	        /*	if (parar_RD1 == 1){
     	        		 ESP_LOGI(TAG1, "4- Para RD es true \r\n");
     	        		 vTaskDelay( pdMS_TO_TICKS(3000) );
-    	        	}
+    	        	}*/
 
     	        	//Espera un segundo que es el tiempo optimo de espera para solicitar los datos
 	        	    vTaskDelay( pdMS_TO_TICKS(1000) );
@@ -909,9 +911,19 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     		if (gps_data.ronda_error >= 25){
     			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
     			gps_data.ronda_error = 0;
+    			gps_data.ronda = 0;
     			gps_data.error_gps = 1;
     			xQueueOverwrite(xQueue_gps,&gps_data);
     			ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+    			bzero(NMEA_data.NMEA_GNRMC,256);
+    			len7 = 0;
+    			len5 = 0;
+    			len3 = 0;
+    			prom_lat = 0;
+    			prom_lon = 0;
+    			auxi1_echo = 0;
+    			auxi2_echo = 0;
+    			parar_RD1 = (uint8_t *) 1;
         		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
         		len = 0;
     			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);

@@ -50,6 +50,7 @@ float prom_lat = 0;
 
 //Para saber si es la primera vez que mando AT + GPS = 1
 uint8_t primera_vuelta = 0;
+uint8_t segunda_vuelta = 0;
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
@@ -66,7 +67,6 @@ extern const int BEGIN_TASK2;
 extern const int SYNC_BIT_TASK2;
 
 
-
 //Para la cola
 
 extern QueueHandle_t xQueue_gps;
@@ -79,8 +79,6 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	// Con la variable ronda (que se aumenta cada vez que llega algo al buffer) se lleva el control
 	// de la posicion que se guardara en el arreglo de latitud y longitud. Al llegar a 10 debe parar
 	// de enviar datos
-	ESP_LOGI("PRUEBA","Declarare en RMCparsing");
-	ESP_LOGI("PRUEBA","ronda es %d",GPS_data->ronda);
 	rmc_data_t rmc_data;
 	uint16_t flags2[11] = {0};
 //	int l1 = 0;
@@ -94,43 +92,26 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	char ano[3] = "";
 	//se agrega coma porque poniendo ',' en strstr no agarraba
 	char* coma = ",";
-	//Para calcular un promedio final de los valores se agrega prom de auxiliar
-	ESP_LOGI("PRUEBA","declare  RMCparsing");
 	//Para contar cuantas veces se guardan los datos se aumenta la cantidad de ronda
 	GPS_data->ronda++;
-	ESP_LOGI("TAG2","ronda es %d",GPS_data->ronda);
-	GPS_data->stage++;
-	ESP_LOGI("TAG2","flag %d es %d",0,flags2[0]);
-	ESP_LOGI("TAG2","flag %d es %d",1,flags2[1]);
-	ESP_LOGI("TAG2","flag %d es %d",2,flags2[2]);
-	ESP_LOGI("TAG2","flag %d es %d",3,flags2[3]);
-	ESP_LOGI("TAG2","flag %d es %d",4,flags2[4]);
-	ESP_LOGI("TAG2","flag %d es %d",5,flags2[5]);
-	ESP_LOGI("TAG2","flag %d es %d",6,flags2[6]);
-	ESP_LOGI("TAG2","flag %d es %d",7,flags2[7]);
-	ESP_LOGI("TAG2","flag %d es %d",8,flags2[8]);
-	ESP_LOGI("TAG2","flag %d es %d",9,flags2[9]);
-	ESP_LOGI("TAG2","flag %d es %d",10,flags2[10]);
+	GPS_data->stage = 0;
+
 
 
 //Guardar la posicion de las comas en flags2
 	for(int k1 = 0; k1 < 11; k1++){
 		char* pos = strstr(GNRMC_data,coma);
 		flags2[k1] = pos - GNRMC_data;
-		ESP_LOGI(TAG2,"flag2 es: %d \r\n",flags2[k1]);
+	//	ESP_LOGI(TAG2,"flag2 es: %d \r\n",flags2[k1]);
 		GNRMC_data[flags2[k1]] = '-';
 	}
-	ESP_LOGI("PRUEBA","Ya tengo las comas");
 
 	for (int k1 = 0; k1 < 9; k1++){
-		ESP_LOGI("PRUEBA","Estoy en el for con k1 %d",k1);
-		switch (k1){
-		case 0:
-			ESP_LOGI("PRUEBA","Caso 0.0");
-	//		l1 = 0;
+		GPS_data->stage = k1;
+		switch (GPS_data->stage){
+		case time_UTC:
+
 			strncpy(rmc_data.time_UTC,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
-	//		l1 = strlen(rmc_data.time_UTC);
-			ESP_LOGI("PRUEBA","Caso 0.1");
 			rmc_data.time_UTC[10] = 0x00;
 	//		ESP_LOGI(TAG2,"El tiempo UTC es: %s\r\n",rmc_data.time_UTC);
 
@@ -166,22 +147,22 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 				GPS_data->hour = 23;
 			break;
 			}
-			ESP_LOGI(TAG2,"El hora es: %d\r\n",GPS_data->hour);
+		/*	ESP_LOGI(TAG2,"El hora es: %d\r\n",GPS_data->hour);
 			ESP_LOGI(TAG2,"El min es: %d\r\n",GPS_data->minute);
-			ESP_LOGI(TAG2,"El seg es: %d\r\n",GPS_data->second);
+			ESP_LOGI(TAG2,"El seg es: %d\r\n",GPS_data->second);*/
 
 
 		break;
-		case 1:
+		case active:
 		//	l1 = 0;
 			strncpy(rmc_data.active,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.active[1] = 0x00;
 		//	ESP_LOGI(TAG2,"El estado es: %s\r\n",rmc_data.active);
 			strcpy(GPS_data->estado,rmc_data.active);
-			ESP_LOGI(TAG2,"El estado es: %s\r\n",GPS_data->estado);
+		//	ESP_LOGI(TAG2,"El estado es: %s\r\n",GPS_data->estado);
 
 		break;
-		case 2:
+		case latitude:
 	//		l1 = 0;
 			strncpy(rmc_data.latitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 	//		l1 = strlen(rmc_data.latitude);
@@ -212,25 +193,18 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	//		float lon1 = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
 
 			GPS_data->latitude[GPS_data->ronda] = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
-			ESP_LOGI(TAG2,"La latitud en DEG es: %f\r\n",GPS_data->latitude[GPS_data->ronda]);
-			ESP_LOGI(TAG2,"La ronda es: %d\r\n",GPS_data->ronda);
+	//		ESP_LOGI(TAG2,"La latitud en DEG es: %f\r\n",GPS_data->latitude[GPS_data->ronda]);
 
 			prom_lat +=  GPS_data->latitude[GPS_data->ronda];
+			GPS_data->latitude_prom = GPS_data->latitude[GPS_data->ronda];
 
-			ESP_LOGI(TAG2,"El pre -prom lat en DEG es: %f\r\n",prom_lat);
+	//		ESP_LOGI(TAG2,"El pre -prom lat en DEG es: %f\r\n",prom_lat);
 
-			GPS_data->latitude_prom = prom_lat/10;
-			ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
-		/*	if (ronda == 10){
-				GPS_data->latitude_prom = prom_lat/10;
-				ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
-			}*/
-
+	//		GPS_data->latitude_prom = prom_lat/10;
+	//		ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
 		break;
-		case 3:
-//			l1 = 0;
+		case latitude_dir:
 			strncpy(rmc_data.latitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
-//			l1 = strlen(rmc_data.latitude_dir);
 			rmc_data.latitude_dir[2] = 0x00;
 
 			if(rmc_data.latitude_dir[0] == 'N'){
@@ -238,9 +212,9 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			}else{
 				sprintf(GPS_data->latitude_direct,"Sur");
 			}
-			ESP_LOGI(TAG2,"La direccion de la latitud es: %s\r\n",GPS_data->latitude_direct);
+		//	ESP_LOGI(TAG2,"La direccion de la latitud es: %s\r\n",GPS_data->latitude_direct);
 		break;
-		case 4:
+		case longitude:
 //			l1 = 0;
 			strncpy(rmc_data.longitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 //			l1 = strlen(rmc_data.longitude);
@@ -269,25 +243,19 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 			//Obtener la longitud en deg y guardolo
 			GPS_data->longitude[GPS_data->ronda] = (float)rmc_data.longitude_deg_f + (float)(rmc_data.longitude_min_f/60);
-			ESP_LOGI(TAG2,"La longitud en DEG es: %f\r\n",GPS_data->longitude[GPS_data->ronda]);
+	//		ESP_LOGI(TAG2,"La longitud en DEG es: %f\r\n",GPS_data->longitude[GPS_data->ronda]);
 
 			prom_lon +=  GPS_data->longitude[GPS_data->ronda];
-			ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lon);
-			GPS_data->longitude_prom = prom_lon/10;
-			ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
-
-		/*	if (ronda == 10){
-				GPS_data->longitude_prom = prom_lon/10;
-				ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
-			}*/
-
+	//		ESP_LOGI(TAG2,"El pre -prom long en DEG es: %f\r\n",prom_lon);
+	//		GPS_data->longitude_prom = prom_lon/10;
+	//		ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
+			GPS_data->longitude_prom = GPS_data->longitude[GPS_data->ronda];
 
 
 		break;
-		case 5:
-	//		l1 = 0;
+		case longitude_dir:
+
 			strncpy(rmc_data.longitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
-	//		l1 = strlen(rmc_data.latitude_dir);
 			rmc_data.longitude[1] = 0x00;
 	//		ESP_LOGI(TAG2,"La longitud-dir es: %s\r\n",rmc_data.latitude_dir);
 
@@ -296,34 +264,29 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			}else{
 				sprintf(GPS_data->longitude_direct,"Oeste");
 			}
-			ESP_LOGI(TAG2,"La direccion de la longitud es: %s\r\n",GPS_data->longitude_direct);
+	//		ESP_LOGI(TAG2,"La direccion de la longitud es: %s\r\n",GPS_data->longitude_direct);
 		break;
-		case 6:
-//			l1 = 0;
+		case speed:
 			strncpy(rmc_data.speed,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
-//			l1 = strlen(rmc_data.speed);
 			rmc_data.speed[5] = 0x00;
 		//	ESP_LOGI(TAG2,"La velocidad es: %s\r\n",rmc_data.speed);
 
 			GPS_data->speed = atof(rmc_data.speed);
-			ESP_LOGI(TAG2,"La velocidad es: %f\r\n",GPS_data->speed);
+		//	ESP_LOGI(TAG2,"La velocidad es: %f\r\n",GPS_data->speed);
 
 		break;
-		case 7:
-	//		l1 = 0;
+		case track:
+
 			strncpy(rmc_data.track,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
-	//		l1 = strlen(rmc_data.track);
 			rmc_data.track[4] = 0x00;
-			ESP_LOGI(TAG2,"El track es: %s\r\n",rmc_data.track);
+		//	ESP_LOGI(TAG2,"El track es: %s\r\n",rmc_data.track);
 
 			//No agrego track porque no hace falta todavia
 	//		GPS_data->track = atof(rmc_data.speed);
 	//		ESP_LOGI(TAG2,"La velocidad es: %s\r\n",GPS_data->track);
 		break;
-		case 8:
-	//		l1 = 0;
+		case date:	//		l1 = 0;
 			strncpy(rmc_data.date,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
-	//		l1 = strlen(rmc_data.date);
 			rmc_data.date[6] = 0x00;
 	//		ESP_LOGI(TAG2,"La fecha es: %s\r\n",rmc_data.date);
 
@@ -382,8 +345,112 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 				break;
 				}
 
-				ESP_LOGI(TAG2,"La fecha es %d-%d-%d \r\n",GPS_data->day,GPS_data->month,GPS_data->year);
-				ESP_LOGI(TAG2,"La fecha es %d de %s del 20%d \r\n",GPS_data->day,GPS_data->mes,GPS_data->year);
+				if (GPS_data->hour == 20 || GPS_data->hour == 21 || GPS_data->hour == 22 || GPS_data->hour == 23){
+					switch (GPS_data->month){
+					case 1:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Diciembre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 2:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Enero");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 3:
+						//No se toma en cuenta el a;o biciesto
+						if ( GPS_data->day == 1){
+							GPS_data->day = 28;
+							if (GPS_data->year == 24 || GPS_data == 28){
+								GPS_data->day = 29;
+							}
+							strcpy(GPS_data->mes,"Febrero");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 4:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Marzo");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 5:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Abril");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 6:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Mayo");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 7:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Junio");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 8:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Julio");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 9:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Agosto");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 10:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Septiembre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 11:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 31;
+							strcpy(GPS_data->mes,"Octubre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					case 12:
+						if ( GPS_data->day == 1){
+							GPS_data->day = 30;
+							strcpy(GPS_data->mes,"Noviembre");
+						} else {
+							GPS_data->day = GPS_data->day -1;
+						}
+					break;
+					}
+				}
+			//	ESP_LOGI(TAG2,"La fecha es %d-%d-%d \r\n",GPS_data->day,GPS_data->month,GPS_data->year);
+			//	ESP_LOGI(TAG2,"La fecha es %d de %s del 20%d \r\n",GPS_data->day,GPS_data->mes,GPS_data->year);
 		break;
 		}
 	}
@@ -399,10 +466,8 @@ static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
 	char RMC[3] = "RMC";
 
 	if (data[2] == RMC[0] && data[3] == RMC[1] && data[4] == RMC[2]){
-		ESP_LOGI(TAG2,"Empezara a parsear RMC");
-		ESP_LOGI(TAG2,"ronda es %d", GPS_data.ronda);
+	//	ESP_LOGI(TAG2,"Empezara a parsear RMC");
 		GPS_data  = RMC_parsing(data, &GPS_data);
-		ESP_LOGI(TAG2,"ronda es %d", GPS_data.ronda);
 	}
 
 
@@ -494,20 +559,20 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_APB,
     };
-    ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
+ //   ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
     uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, ECHO_TEST_RTS, ECHO_TEST_CTS);
 
-    ESP_LOGI(TAG1, "Uart 0 Iniciado");
-    ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
+ //   ESP_LOGI(TAG1, "Uart 0 Iniciado");
+ //   ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
 
     uart_param_config(UART_NUM_2, &uart_config);
     uart_set_pin(UART_NUM_2, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS);
     uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
 
 
-    ESP_LOGI(TAG1, "Uart 2 Iniciado");
+//    ESP_LOGI(TAG1, "Uart 2 Iniciado");
 
     //Se declara la variable que copiara lo que llegue al buffer
     //uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
@@ -541,10 +606,17 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
     	if (parar_RD1 == 1){
     		parar_RD1 = 0;
+    		uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+    	}
+
+    	if  (primera_vuelta == 0){
+    		primera_vuelta = 1;
+    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+    		len = 0;
     	}
 
     	//Se debe limpiar tx_buf para borrar lo de la ronda anterior
-    	ESP_LOGI(TAG1, "Limpiare tx_buf");
+   // 	ESP_LOGI(TAG1, "Limpiare tx_buf");
     	bzero(tx_buf,BUF_SIZE);
 
     	// Empezara escaladamente a mandar lo comandos AT necesarios en cada vuelta
@@ -558,19 +630,23 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 	    break;
     	case 1:
     		//En la segunda vuelta activa el GPS
-    		if (primera_vuelta == 0){
+    		if (segunda_vuelta == 0){
         		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
         		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
     		} else {
     			//Si ya no es la primera vuelta entonces hago esto para que entre en el siguiente if
     			len5 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
-    			ESP_LOGI(TAG1, "Len5 es 2\r\n");
     		}
     	break;
     	case 2:
     		//En la tercera vuelta solicita los datos del GPS
-    		len7 = uart_write_bytes(UART_NUM_2,"AT+GPSRD=1\r\n", 12);
-    		ESP_LOGI(TAG1, "envio: AT+GPSRD=1\r\n");
+    		if (auxi2_echo == 0){
+    			len7 = uart_write_bytes(UART_NUM_2,"AT+GPSRD=1\r\n", 12);
+    			ESP_LOGI(TAG1, "envio: AT+GPSRD=1\r\n");
+    		} else {
+    			//Si ya no es la primera vuelta entonces hago esto para que entre en el siguiente if
+    			len7 = 2;
+    		}
 		break;
     	}
     	}
@@ -580,9 +656,14 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	// len7 no se reinicia para que luego de pedir los datos GPS siempre entre
     	if (len3*len5*len7>0) {
     		//Lee el uart
-    		ESP_LOGI(TAG1, "Voy a leer el uart");
+    	//	ESP_LOGI(TAG1, "Voy a leer el uart");
     	    len = uart_read_bytes(UART_NUM_2, (uint8_t*)tx_buf, BUF_SIZE, pdMS_TO_TICKS(10));
+
     	    ESP_LOGI(TAG1, "len es: %d",len);
+
+    	//    ESP_LOGI(TAG1, "len es: %d",len);
+
+
     	    //Se comprueba si llego algo al uart y se publica que llego
     	    if(len>0){
     	     //	ESP_LOGI(TAG1, "Borrare auxc2");
@@ -599,10 +680,10 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	     		memcpy(auxc2_echo,tx_buf,BUF_SIZE);
     	     	}
     	     	//Mostrar auxc2
-    	     	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
+    	    // 	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
     	     	//printf(" Copio el buffer, auxc2 es: %s",auxc2)
-    	     	ESP_LOGI(TAG1, " Ya termino auxc2");
-    	     	ESP_LOGI(TAG1, "ronda es: %d",gps_data.ronda);
+    	 //    	ESP_LOGI(TAG1, " Ya termino auxc2");
+
 
     	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y "ATGPSRD"
     	        if (parar_RD1 == 0){
@@ -614,7 +695,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        			ESP_LOGI(TAG1, "1- Respondio AT OK \r\n");
     	         	        auxi1_echo++;
     	         	        len3 = 0;
-    	         	       gps_data.ronda_error = 0;
+    	         	        gps_data.ronda_error = 0;
     	         	    } else {
      	        	    	ESP_LOGI(TAG1, "1- NO respondio AT OK \r\n");
      	        	    	gps_data.ronda_error++;
@@ -623,27 +704,57 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
      	        	    		gps_data.ronda_error = 0;
      	        	    		gps_data.error_gps = 1;
      	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+     	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+     	        	    		len = 0;
      	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
      	        	    	}
      	        	    }
     	        		break;
     	        	case 1:
     	        		gps_data.ronda_error = 0;
-    	        		if (primera_vuelta == 0){
+    	        		if (segunda_vuelta == 0){
     	        			if (strncmp(auxc2_echo,"AT+GPS=1\r\nOK\r\n",10) == 0){
     	        			   auxi1_echo++;
+    	        			   gps_data.ronda_error = 0;
     	        			   len5 = 0;
     	        			   //Ahora se esperara 40 segundos para que se logre conectar a la red GPS
     	        			   ESP_LOGI(TAG1, "2- Respondio AT+GPS=1 OK \r\n");
     	        		       ESP_LOGI(TAG1, "2- Esperare 30 segundos \r\n");
     	        		       vTaskDelay(pdMS_TO_TICKS(30000));
+    	        			}else {
+         	        	    	ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 \r\n");
+         	        	    	gps_data.ronda_error++;
+         	        	    	if (gps_data.ronda_error >= 15){
+         	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+         	        	    		gps_data.ronda_error = 0;
+         	        	    		auxi1_echo = 0;
+         	        	    		gps_data.error_gps = 1;
+         	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+         	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+         	        	    		len = 0;
+         	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+         	        	    	}
     	        			}
+
     	        		} else {
     	        			if (strncmp(auxc2_echo,"AT\r\n\r\nOK\r\n",10) == 0){
 	        		    	auxi1_echo++;
 	        		    	len5 = 0;
-	        				}
+	        				}else {
+         	        	    	ESP_LOGI(TAG1, "2- NO respondio AT+GPS=1 \r\n");
+         	        	    	gps_data.ronda_error++;
+         	        	    	if (gps_data.ronda_error >= 15){
+         	        	    		//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+         	        	    		gps_data.ronda_error = 0;
+         	        	    		gps_data.error_gps = 1;
+         	        	    		auxi1_echo = 0;
+         	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+         	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+         	        	    		len = 0;
+         	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+         	        	    	}
 	        			}
+    	        		}
     	        		break;
     	        		//Este caso causa molestia de vez en cuando y aparte no es necesario
     	        		//para verificar si llegan los datos
@@ -659,6 +770,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        	    //Entrara aca despues de mandar AT+GPSRD=1
     	        	    //En este ciclo se encarga de separar las oraciones del bus NMEA del GPS
     	        			ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
+    	        			auxi2_echo = 1;
 
     	        			int i2 = 0;
     	        			//En este for escanea el buffer por la posicion de $
@@ -728,15 +840,15 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        		//	GPS_parsing(NMEA_data.NMEA_GNGGA, gps_data);
 
     	        			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
-    	        			ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
     	        			gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
-    	        	//		gps_data = RMC_parsing(NMEA_data.NMEA_GNRMC, &gps_data, ronda);
+    	        			ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
     	        			xQueueOverwrite(xQueue_gps,&gps_data);
     	        			bzero(NMEA_data.NMEA_GNRMC,256);
+    	        			gps_data.stage = 0;
 
-    	        			if (primera_vuelta == 0){
+    	        			if (segunda_vuelta == 0){
     	        				if (gps_data.ronda == 10 ){
-    	        					primera_vuelta = 1;
+    	        					segunda_vuelta = 1;
     	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
     	        					gps_data.ronda = 0;
     	        				//	bzero(NMEA_data.NMEA_GNRMC,256);
@@ -744,9 +856,11 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        					prom_lat = 0;
     	        					prom_lon = 0;
     	        					auxi1_echo = 0;
+    	        					auxi2_echo = 0;
     	        					parar_RD1 = (uint8_t *) 1;
     	        					//Para detener el envio de datos del GPS se manda lo siguiente
     	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+    	        					len = 0;
     	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     	        				//	xEventGroupClearBits(event_group, BEGIN_TASK2);
     	        				}
@@ -760,9 +874,11 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 	        					prom_lat = 0;
 	        					prom_lon = 0;
 	        					auxi1_echo = 0;
+	        					auxi2_echo = 0;
 	        					parar_RD1 = (uint8_t *) 1;
 	        					//Para detener el envio de datos del GPS se manda lo siguiente
 	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+	        					len = 0;
 	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
 	        				//	xEventGroupClearBits(event_group, BEGIN_TASK2);
 	        				}
@@ -771,10 +887,10 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        		}
     	        	}
 
-    	        	if (parar_RD1 == 1){
+    	        /*	if (parar_RD1 == 1){
     	        		 ESP_LOGI(TAG1, "4- Para RD es true \r\n");
     	        		 vTaskDelay( pdMS_TO_TICKS(3000) );
-    	        	}
+    	        	}*/
 
     	        	//Espera un segundo que es el tiempo optimo de espera para solicitar los datos
 	        	    vTaskDelay( pdMS_TO_TICKS(1000) );
@@ -787,11 +903,24 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     		vTaskDelay( pdMS_TO_TICKS(1000) );
     		ESP_LOGI(TAG1, "2+ Espere 1 segundo");
     		gps_data.ronda_error++;
-    		if (gps_data.ronda_error >= 15){
+    		if (gps_data.ronda_error >= 25){
     			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
     			gps_data.ronda_error = 0;
+    			gps_data.ronda = 0;
     			gps_data.error_gps = 1;
+    			xQueueOverwrite(xQueue_gps,&gps_data);
     			ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+    			bzero(NMEA_data.NMEA_GNRMC,256);
+    			len7 = 0;
+    			len5 = 0;
+    			len3 = 0;
+    			prom_lat = 0;
+    			prom_lon = 0;
+    			auxi1_echo = 0;
+    			auxi2_echo = 0;
+    			parar_RD1 = (uint8_t *) 1;
+        		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
+        		len = 0;
     			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     		}
 

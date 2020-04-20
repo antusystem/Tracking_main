@@ -23,7 +23,9 @@
 #include "bg96.h"
 #include "nvs_flash.h"
 #include "freertos/queue.h"
-
+#include "tracking.h"
+#include "esp_sleep.h"
+#include "driver/rtc_io.h"
 
 
 
@@ -50,6 +52,11 @@
 QueueHandle_t xQueue_temp;
 QueueHandle_t xQueue_gps;
 
+//Para el limite de la temperatura
+uint8_t limite_a =0;
+uint8_t limite_b =0;
+uint8_t limite_c = 0;
+
 
 
 
@@ -74,9 +81,18 @@ const int GOT_DATA_BIT = BIT2;
   const int SYNC_BIT_TASK2 = BIT7;
 
 //Para conocer el estado de la puerta
+  //puerta a es el estado actual de la puerta, puerta b es para saber si se abrio y cambia si se cerro
+  //despues de mandar el mensaje, puerta c es para saltar a mandar el mensaje inmediatamente pero solo
+  //cuando se abre la puerta, si se mantiene abierta esperara el ciclo normal del programa
 uint8_t puerta_a = 0;
-uint8_t puerta_b = 0;
+//uint8_t puerta_b = 0;
 uint8_t puerta_c = 0;
+e_Puerta puerta_b = 0;
+
+
+
+
+
 
 #if CONFIG_EXAMPLE_SEND_MSG
 /**
@@ -267,6 +283,7 @@ void Mandar_mensaje2(void *P)
 	uint8_t  led_gsm = 0;
 	gps_data_t gps_data2;
 	AM2301_data_t Thum2;
+	message_data_t message_data;
 
 
 	printf("Entre en mandar mensaje \r\n");
@@ -284,43 +301,52 @@ void Mandar_mensaje2(void *P)
             led_gsm = 1;
     	}
 
-    	ESP_LOGI(TAG, "La latitud prom es: %f", gps_data.latitude_prom);
-    	ESP_LOGI(TAG, "La latitud dir es: %s", gps_data.latitude_direct);
-        ESP_LOGI(TAG, "La longitud prom es: %f", gps_data.longitude_prom);
-      	ESP_LOGI(TAG, "La longitud dir es: %s", gps_data.longitude_direct);
-
     /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
-     * */
+      */
     xQueueReceive(xQueue_temp,&Thum2,portMAX_DELAY);
-
+	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
+	sprintf(message_data.Temperatura, "%f",Thum2.Prom_temp[Thum2.pos_temp-1]);
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
-    if (Thum.error_temp == 0){
-    	sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-    	ESP_LOGI(TAG, "[%s]", message);
-    } else {
+	 if (Thum2.error_temp == 0){
+		 switch(limite_b){
+		 case 0:
+		    	sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+		    	ESP_LOGI(TAG, "[%s]", message);
+		 break;
+		 case 1:
+		    sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+		    ESP_LOGI(TAG, "[%s]", message);
+		    if (limite_a == 0){
+		    	limite_b = 0;
+		    }
+	     break;
+		 }
+	 } else {
     	Thum.error_temp = 0;
     	sprintf(message,"No se logro medir la temperatura. Revisar las conexiones.");
     	ESP_LOGI(TAG, "[%s] ", message);
     }
 
     xQueueReceive(xQueue_gps,&gps_data2,portMAX_DELAY);
+    sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
+    sprintf(message_data.Longitude, "%f",gps_data2.latitude_prom);
+
 
     switch (puerta_b){
-    case 0:
+    case P_cerrada:
     // Verifico si no hubo error al conectarse a al modulo GPS
-        if (gps_data.error_gps == 0){
+        if (gps_data2.error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-        	if (gps_data.year == 20){
+        	if (gps_data2.year == 20){
 
         		sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
         		ESP_LOGI(TAG, "[%s] ", message);
         		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
             	ESP_LOGI(TAG, "[%s] ", message);
         	} else{
-
-			sprintf(message,"No se logro conectar a la red GPS.");
-			ESP_LOGI(TAG, "[%s] ", message);
+        		sprintf(message,"No se logro conectar a la red GPS.");
+        		ESP_LOGI(TAG, "[%s] ", message);
         	}
         } else{
         	gps_data.error_gps = 0;
@@ -328,25 +354,22 @@ void Mandar_mensaje2(void *P)
     		ESP_LOGI(TAG, "[%s] ", message);
         }
     break;
-    case 1:
+    case P_abierta:
     	// Verifico si no hubo error al conectarse a al modulo GPS
-    	if (gps_data.error_gps == 0){
+    	if (gps_data2.error_gps == 0){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-    		if (gps_data.year == 20){
-
+    		if (gps_data2.year == 20){
     			sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
 			ESP_LOGI(TAG, "[%s] ", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
     			}
-
-    	        sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
-  		ESP_LOGI(TAG, "[%s] ", message);
+    	     sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
+    	     ESP_LOGI(TAG, "[%s] ", message);
     	    } else{
-
     	    	sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
- 		ESP_LOGI(TAG, "[%s] ", message);
+    	    	ESP_LOGI(TAG, "[%s] ", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
@@ -354,7 +377,6 @@ void Mandar_mensaje2(void *P)
     	    }
     	} else{
 			gps_data.error_gps = 0;
-
 			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
 			ESP_LOGI(TAG, "[%s] ", message);
 			if (puerta_a == 0){
@@ -370,7 +392,60 @@ void Mandar_mensaje2(void *P)
 
 void app_main(void)
 {
-	nvs_flash_init();
+	int a = 0;
+	esp_err_t err = nvs_flash_init();
+	    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+	        // NVS partition was truncated and needs to be erased
+	        // Retry nvs_flash_init
+	        ESP_ERROR_CHECK(nvs_flash_erase());
+	        err = nvs_flash_init();
+	    }
+	    ESP_ERROR_CHECK( err );
+
+	    // Open
+	    printf("\n");
+	    printf("Opening Non-Volatile Storage (NVS) handle... ");
+	    nvs_handle_t my_handle;
+	    err = nvs_open("storage2", NVS_READWRITE, &my_handle);
+	    if (err != ESP_OK) {
+	        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+	    } else {
+	        printf("Done\n");
+
+	        // Read
+	        printf("Reading restart counter from NVS ... ");
+	        int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
+	        err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+	        switch (err) {
+	            case ESP_OK:
+	                printf("Done\n");
+	                printf("Restart counter = %d\n", restart_counter);
+	                break;
+	            case ESP_ERR_NVS_NOT_FOUND:
+	                printf("The value is not initialized yet!\n");
+	                break;
+	            default :
+	                printf("Error (%s) reading!\n", esp_err_to_name(err));
+	        }
+
+	        // Write
+	        printf("Updating restart counter in NVS ... ");
+	        restart_counter++;
+	        a = restart_counter;
+	        err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
+	        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+	        // Commit written value.
+	        // After setting any values, nvs_commit() must be called to ensure changes are written
+	        // to flash storage. Implementations may write to storage at other times,
+	        // but this is not guaranteed.
+	        printf("Committing updates in NVS ... ");
+	        err = nvs_commit(my_handle);
+	        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+	        // Close
+	        nvs_close(my_handle);
+	    }
 
 	/*Configurar inicio del SIM800l*/
 	/*Poner los pines como GPIO*/
@@ -398,8 +473,8 @@ void app_main(void)
 
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 5, NULL,0);
-	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 5, NULL,0);
-	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 5, NULL,0);
+	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 5, NULL,1);
+	xTaskCreatePinnedToCore(&Mandar_mensaje2, "Mandar mensaje2", 1024*6, NULL, 6, NULL,0);
 //	La tarea dht se inicia en sync desde mandar mensaje
 	xEventGroupSetBits(event_group, BEGIN_TASK2);
 
@@ -410,14 +485,14 @@ void app_main(void)
 		//puerta_a sirve para saber si la puerta esta abierta o cerrada en todo momento
 		//puerta_b se usa para tener una referencia de cuando la puerta se abrio y no repetir
 		//el uso de las tareas
-		if (gpio_get_level(GPIO_NUM_14) == 1){
+		if (gpio_get_level(GPIO_NUM_14) == 0){
 			vTaskDelay(200 / portTICK_PERIOD_MS);
 			puerta_a = 1;
 			if (puerta_b == 0){
 				puerta_b = 1;
 			}
 		}
-		if (gpio_get_level(GPIO_NUM_14) == 0){
+		if (gpio_get_level(GPIO_NUM_14) == 1){
 			vTaskDelay(200 / portTICK_PERIOD_MS);
 			puerta_a = 0;
 		}
@@ -431,7 +506,9 @@ void app_main(void)
 			xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
 			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
 		}
-		vTaskDelay(200 / portTICK_PERIOD_MS);
+		printf("Restart counter = %d\n", a);
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+
 	}
 
 

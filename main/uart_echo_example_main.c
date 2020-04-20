@@ -578,23 +578,19 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	//Cuando se envia algo len se vuelve la longitud de lo que se envio
     	//si no se envio nada, entonces no estrara en esta parte. Ademas,
     	// len7 no se reinicia para que luego de pedir los datos GPS siempre entre
-    	if ((len3 > 0) || (len5 > 0) || (len7 > 0) ) {
-
+    	if (len3*len5*len7>0) {
     		//Lee el uart
     		ESP_LOGI(TAG1, "Voy a leer el uart");
     	    len = uart_read_bytes(UART_NUM_2, (uint8_t*)tx_buf, BUF_SIZE, pdMS_TO_TICKS(10));
     	    ESP_LOGI(TAG1, "len es: %d",len);
-
     	    //Se comprueba si llego algo al uart y se publica que llego
     	    if(len>0){
     	     //	ESP_LOGI(TAG1, "Borrare auxc2");
     	     	// Borrar lo que tenia antes auxc2
     	     	bzero(auxc2_echo,BUF_SIZE);
     	     	// Mostar que se borro todo
-    	    // 	ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
+    	     	// 	ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
     	     	// Copiar lo que esta en el buffer de recepcion
-
-
     	     	//Se copia lo que llego al buffer, las primeras 2 veces no hace falta que
     	     	//tenga una dimension tan grande el auxiliar
     	     	if (auxi1_echo < 2){
@@ -602,18 +598,13 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	     	} else {
     	     		memcpy(auxc2_echo,tx_buf,BUF_SIZE);
     	     	}
-
-
     	     	//Mostrar auxc2
     	     	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
     	     	//printf(" Copio el buffer, auxc2 es: %s",auxc2)
     	     	ESP_LOGI(TAG1, " Ya termino auxc2");
     	     	ESP_LOGI(TAG1, "ronda es: %d",gps_data.ronda);
 
-
     	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y "ATGPSRD"
-
-
     	        if (parar_RD1 == 0){
 
     	        	switch (auxi1_echo){

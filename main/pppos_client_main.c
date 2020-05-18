@@ -58,6 +58,11 @@ uint8_t limite_b =0;
 uint8_t limite_c = 0;
 
 
+#define MEN_TXD  (GPIO_NUM_27)
+#define MEN_RXD  (GPIO_NUM_26)
+#define MEN_RTS  (UART_PIN_NO_CHANGE)
+#define MEN_CTS  (UART_PIN_NO_CHANGE)
+
 
 
 //#define BROKER_URL "mqtt://kike:Kike3355453@mqtt.tiosplatform.com"
@@ -87,6 +92,7 @@ const int GOT_DATA_BIT = BIT2;
 uint8_t puerta_a = 0;
 //uint8_t puerta_b = 0;
 uint8_t puerta_c = 0;
+e_Puerta puerta_b = 0;
 
 
 
@@ -306,6 +312,20 @@ void Mandar_mensaje(void *P)
 	AM2301_data_t Thum2;
 	message_data_t message_data;
 
+	//Se inicia la tarea configurando los Uart 0 y Uart 2
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+ //   ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_set_pin(UART_NUM_1, MEN_TXD, MEN_RXD, MEN_RTS, MEN_CTS);
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
+
 	printf("Entre en mandar mensaje \r\n");
 	for(;;){
 
@@ -314,14 +334,16 @@ void Mandar_mensaje(void *P)
 	    xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
 
 		//El led prendera 1 segundo al entrar en esta etapa
-    	if (led_gsm == 0){
-            gpio_set_level(GPIO_NUM_27, 1);
+    /*	if (led_gsm == 0){
+            gpio_set_level(GPIO_NUM_12, 1);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            gpio_set_level(GPIO_NUM_27, 0);
+            gpio_set_level(GPIO_NUM_12, 0);
             led_gsm = 1;
-    	}
+    	}*/
+	    /* Power down module */
 
-
+	    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+	    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     	xQueueReceive(xQueue_temp,&Thum2,portMAX_DELAY);
     	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
@@ -538,7 +560,66 @@ void Mandar_mensaje(void *P)
 void app_main(void)
 {
 
-	nvs_flash_init();
+	//nvs_flash_init();
+
+	int a = 0;
+	esp_err_t err = nvs_flash_init();
+	    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+	        // NVS partition was truncated and needs to be erased
+	        // Retry nvs_flash_init
+	        ESP_ERROR_CHECK(nvs_flash_erase());
+	        err = nvs_flash_init();
+	    }
+	    ESP_ERROR_CHECK( err );
+
+	    // Open
+	    printf("\n");
+	    printf("Opening Non-Volatile Storage (NVS) handle... ");
+	    nvs_handle_t my_handle;
+	    err = nvs_open("storage2", NVS_READWRITE, &my_handle);
+	    if (err != ESP_OK) {
+	        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+	    } else {
+	        printf("Done\n");
+
+	        // Read
+	        printf("Reading restart counter from NVS ... ");
+	        int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
+	        err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+	        switch (err) {
+	            case ESP_OK:
+	                printf("Done\n");
+	                printf("Restart counter = %d\n", restart_counter);
+	                break;
+	            case ESP_ERR_NVS_NOT_FOUND:
+	                printf("The value is not initialized yet!\n");
+	                break;
+	            default :
+	                printf("Error (%s) reading!\n", esp_err_to_name(err));
+	        }
+
+	        // Write
+	        printf("Updating restart counter in NVS ... ");
+	        restart_counter++;
+	        a = restart_counter;
+	        err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
+	        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+	        // Commit written value.
+	        // After setting any values, nvs_commit() must be called to ensure changes are written
+	        // to flash storage. Implementations may write to storage at other times,
+	        // but this is not guaranteed.
+	        printf("Committing updates in NVS ... ");
+	        err = nvs_commit(my_handle);
+	        printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+	        // Close
+	        nvs_close(my_handle);
+	    }
+
+
+
+
 
 	/*Configurar inicio del SIM800l*/
 	/*Poner los pines como GPIO*/
@@ -567,7 +648,7 @@ void app_main(void)
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 5, NULL,0);
 	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 5, NULL,1);
-	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje2", 1024*6, NULL, 6, NULL,0);
+	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje2", 1024*6, NULL, 6, NULL,1);
 //	La tarea dht se inicia en sync desde mandar mensaje
 	xEventGroupSetBits(event_group, BEGIN_TASK2);
 
@@ -579,28 +660,30 @@ void app_main(void)
 		//puerta_b se usa para tener una referencia de cuando la puerta se abrio y no repetir
 		//el uso de las tareas
 		if (gpio_get_level(GPIO_NUM_14) == 0){
-			vTaskDelay(200 / portTICK_PERIOD_MS);
-			puerta_a = 1;
-			if (puerta_b == 0){
-				puerta_b = 1;
-			}
-		}
-		if (gpio_get_level(GPIO_NUM_14) == 1){
-			vTaskDelay(200 / portTICK_PERIOD_MS);
-			puerta_a = 0;
-		}
-		//Ahora que ya se si la puerta se abrio o no, falta activar la tarea
-		//puerta_c sirve para activar inmediatamente la funcion de mandar mensaje pero solo una vez
-		//luego debe de seguir el ciclo normal del programa cambiando unicamente
-		//lo que dicen los mensajes.
+					vTaskDelay(200 / portTICK_PERIOD_MS);
+					puerta_a = 1;
+					if (puerta_b == 0){
+						puerta_b = 1;
+					}
+				}
+				if (gpio_get_level(GPIO_NUM_14) == 1){
+					vTaskDelay(200 / portTICK_PERIOD_MS);
+					puerta_a = 0;
+				}
+				//Ahora que ya se si la puerta se abrio o no, falta activar la tarea
+				//puerta_c sirve para activar inmediatamente la funcion de mandar mensaje pero solo una vez
+				//luego debe de seguir el ciclo normal del programa cambiando unicamente
+				//lo que dicen los mensajes.
 
-		if (puerta_b == 1 && puerta_c == 0 ){
-			puerta_c = 1;
-			xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
-			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
-		}
-		vTaskDelay(200 / portTICK_PERIOD_MS);
-	}
+				if (puerta_b == 1 && puerta_c == 0 ){
+					puerta_c = 1;
+					xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
+					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+				}
+				printf("Restart counter = %d\n", a);
+				vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+			}
 
 
 

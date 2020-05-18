@@ -52,7 +52,7 @@ uint8_t segunda_vuelta = 0;
 
 
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
-#define ECHO_TEST_RXD  (GPIO_NUM_5)
+#define ECHO_TEST_RXD  (GPIO_NUM_0)
 #define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
 #define ECHO_TEST_CTS  (UART_PIN_NO_CHANGE)
 int len = 0;

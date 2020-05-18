@@ -37,10 +37,10 @@ extern uint8_t limite_c;
 
 
 const char *nvs_tag = "NVS";
-struct form_home *form2;
+//struct form_home *form2;
 
-const uint8_t Temp_up = 29;
-const uint8_t Temp_down = 26;
+const float Temp_up = 29;
+const float Temp_down = 26;
 /*
 //Escribir en la memoria flash
 void set_form_flash_init( AM2301_data_t Thum){
@@ -359,7 +359,7 @@ void TareaDHT(void *P){
         }
         //Verifico si la temperatura esta dentro de los limites aceptables
         if (limite_d == 1){
-        	if (Thum.Prom_temp[Thum.pos_temp-1] > Temp_up || Thum.Prom_temp[Thum.pos_temp] < Temp_down){
+        	if (Thum.Prom_temp[Thum.pos_temp-1] > Temp_up || Thum.Prom_temp[Thum.pos_temp-1] < Temp_down){
         		limite_a = 1;
         		if (limite_b == 0){
         			limite_b = 1;

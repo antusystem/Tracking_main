@@ -109,7 +109,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	for (int k1 = 0; k1 < 9; k1++){
 		GPS_data->stage = k1;
 		switch (GPS_data->stage){
-		case time_UTC:
+		case time_utc:
 
 			strncpy(rmc_data.time_UTC,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
 			rmc_data.time_UTC[10] = 0x00;
@@ -153,7 +153,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 
 		break;
-		case active:
+		case Nactive:
 		//	l1 = 0;
 			strncpy(rmc_data.active,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.active[1] = 0x00;
@@ -162,7 +162,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		//	ESP_LOGI(TAG2,"El estado es: %s\r\n",GPS_data->estado);
 
 		break;
-		case latitude:
+		case Nlatitude:
 	//		l1 = 0;
 			strncpy(rmc_data.latitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 	//		l1 = strlen(rmc_data.latitude);
@@ -203,7 +203,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	//		GPS_data->latitude_prom = prom_lat/10;
 	//		ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
 		break;
-		case latitude_dir:
+		case Nlatitude_dir:
 			strncpy(rmc_data.latitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.latitude_dir[2] = 0x00;
 
@@ -214,7 +214,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			}
 		//	ESP_LOGI(TAG2,"La direccion de la latitud es: %s\r\n",GPS_data->latitude_direct);
 		break;
-		case longitude:
+		case Nlongitude:
 //			l1 = 0;
 			strncpy(rmc_data.longitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 //			l1 = strlen(rmc_data.longitude);
@@ -253,7 +253,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 
 		break;
-		case longitude_dir:
+		case Nlongitude_dir:
 
 			strncpy(rmc_data.longitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.longitude[1] = 0x00;
@@ -266,7 +266,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			}
 	//		ESP_LOGI(TAG2,"La direccion de la longitud es: %s\r\n",GPS_data->longitude_direct);
 		break;
-		case speed:
+		case Nspeed:
 			strncpy(rmc_data.speed,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.speed[5] = 0x00;
 		//	ESP_LOGI(TAG2,"La velocidad es: %s\r\n",rmc_data.speed);
@@ -275,7 +275,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		//	ESP_LOGI(TAG2,"La velocidad es: %f\r\n",GPS_data->speed);
 
 		break;
-		case track:
+		case Ntrack:
 
 			strncpy(rmc_data.track,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.track[4] = 0x00;
@@ -285,7 +285,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	//		GPS_data->track = atof(rmc_data.speed);
 	//		ESP_LOGI(TAG2,"La velocidad es: %s\r\n",GPS_data->track);
 		break;
-		case date:	//		l1 = 0;
+		case Ndate:	//		l1 = 0;
 			strncpy(rmc_data.date,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.date[6] = 0x00;
 	//		ESP_LOGI(TAG2,"La fecha es: %s\r\n",rmc_data.date);
@@ -655,6 +655,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	//si no se envio nada, entonces no estrara en esta parte. Ademas,
     	// len7 no se reinicia para que luego de pedir los datos GPS siempre entre
     	if ((len3 > 0) || (len5 > 0) || (len7 > 0) ) {
+    //	if (len3 + len5 + len7 > 0) {
 
     		//Lee el uart
     	//	ESP_LOGI(TAG1, "Voy a leer el uart");

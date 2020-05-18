@@ -1,5 +1,4 @@
 #include "dht.h"
-// Inclusion de librerias -------------------------------------------
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -10,13 +9,12 @@
 #include "nvs_flash.h"
 #include "freertos/semphr.h"
 
-// Definiciones -----------------------------------------------------
+// Definiciones
 #define us_retardo 1
 #define numDHT_bits 40
 #define numDHT_bytes 5
 #define DHTpin 19
-#define Temp_up 29
-#define Temp_down 26
+
 
 
 extern EventGroupHandle_t event_group;
@@ -30,7 +28,6 @@ extern const int SYNC_BIT_TASK1;
 extern const int SYNC_BIT_TASK2;
 /*
 extern const int BEGIN_TASK2;
-
 extern const int BEGIN_TASK3;*/
 
 //Para los limites de la temperatura
@@ -41,6 +38,9 @@ extern uint8_t limite_c;
 
 const char *nvs_tag = "NVS";
 struct form_home *form2;
+
+const uint8_t Temp_up = 29;
+const uint8_t Temp_down = 26;
 /*
 //Escribir en la memoria flash
 void set_form_flash_init( AM2301_data_t Thum){
@@ -51,22 +51,15 @@ void set_form_flash_init( AM2301_data_t Thum){
 		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 	}else{
 		nvs_set_str(ctrl_flash,"Humedad1",Thum.Humedad1);
-
 		nvs_set_str(ctrl_flash,"Temperatura1",Thum.Temperatura1);
-
 		ESP_LOGI("NVS_FLASH","Temperatura2 a guardar en flash: %d",Thum.Temperatura2);
 		nvs_set_u16(ctrl_flash,"Temp2",Thum.Temperatura2);
-
 		nvs_set_u16(ctrl_flash,"Humedad2",Thum.Humedad2);
-
 		ESP_LOGI("NVS_FLASH","Datos_Sensor a guardar en flash: %s",Thum.Datos_Sensor);
-
 		nvs_set_str(ctrl_flash,"Datos_Sensor",Thum.Datos_Sensor);
-
 		err = nvs_commit(ctrl_flash);
 	}
 	nvs_close(ctrl_flash);
-
 }*/
 /*
 //Leer la memoria flash
@@ -74,13 +67,10 @@ void get_form_flash( AM2301_data_t *Thum){
 	size_t len;
 	esp_err_t err;
 	nvs_handle_t ctrl_flash;
-
-
 	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);
 	if (err != ESP_OK) {
 		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 	}else{
-
 		err = nvs_get_str(ctrl_flash,"Humedad1",NULL,&len);
 		if(err==ESP_OK) {
 			err = nvs_get_str(ctrl_flash,"Humedad1",Thum->Humedad1,&len);
@@ -96,7 +86,6 @@ void get_form_flash( AM2301_data_t *Thum){
 				break;
 			}
 		}
-
 		err = nvs_get_str(ctrl_flash,"Temperatura1",NULL,&len);
 		if(err==ESP_OK){
 			err= nvs_get_str(ctrl_flash,"Temperatura1",Thum->Temperatura1,&len);
@@ -110,7 +99,6 @@ void get_form_flash( AM2301_data_t *Thum){
 			default:
 				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 			break;
-
 		}
 		err = nvs_get_u16(ctrl_flash,"Humedad2",&(Thum->Humedad2));
 							switch(err){
@@ -126,9 +114,7 @@ void get_form_flash( AM2301_data_t *Thum){
 							}
 		}
 	}nvs_close(ctrl_flash);
-
 	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);
-
 		if (err != ESP_OK) {
 			printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 		}else{
@@ -144,7 +130,6 @@ void get_form_flash( AM2301_data_t *Thum){
 										printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
 									break;
 								}
-
 			err = nvs_get_str(ctrl_flash,"Datos_Sensor",NULL,&len);
 			if(err==ESP_OK) {
 				err = nvs_get_str(ctrl_flash,"Datos_Sensor",Thum->Datos_Sensor,&len);

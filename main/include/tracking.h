@@ -1,4 +1,3 @@
-/*
  * tracking.h
  *
  *  Created on: Apr 7, 2020
@@ -18,8 +17,8 @@ typedef enum
 typedef struct {
     char Latitude[319];
     char Longitude[319];
-    char Latitude_dir[20];
-    char Longitude_dir[20];/*!< Longitude (degrees) */
+    char Latitude_dir[10];
+    char Longitude_dir[10];/*!< Longitude (degrees) */
     char Humedad[319];
     char Temperatura[319];
 

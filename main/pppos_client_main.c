@@ -87,7 +87,7 @@ const int GOT_DATA_BIT = BIT2;
 uint8_t puerta_a = 0;
 //uint8_t puerta_b = 0;
 uint8_t puerta_c = 0;
-e_Puerta puerta_b = 0;
+
 
 
 //Escribir en la memoria flash
@@ -329,8 +329,8 @@ void Mandar_mensaje(void *P)
 
     	xQueueReceive(xQueue_gps,&gps_data2,portMAX_DELAY);
     	sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
-    	sprintf(message_data.Longitude, "%f",gps_data2.latitude_prom);
-    	sprintf(message_data.Longitude_dir, "%s",gps_data2.longitude_direct);
+    	sprintf(message_data.Longitude, "%f",gps_data2.longitude_prom);
+    	sprintf(message_data.Latitude_dir, "%s",gps_data2.latitude_direct);
     	sprintf(message_data.Longitude_dir, "%s",gps_data2.longitude_direct);
 
     	if (limite_b == 1 || puerta_b == 1){

@@ -24,15 +24,15 @@ typedef struct {
 
 typedef enum
 {
-	time_UTC = 0,	//Valor para indicara el tiempo en UTC
-	active,			//Dice si esta conectado, aunque no siempre funciona bien en el A9G
-	latitude,
-	latitude_dir,
-	longitude,
-	longitude_dir,
-	speed,
-	track,
-	date,
+	time_utc = 0,	//Valor para indicara el tiempo en UTC
+	Nactive,			//Dice si esta conectado, aunque no siempre funciona bien en el A9G
+	Nlatitude,
+	Nlatitude_dir,
+	Nlongitude,
+	Nlongitude_dir,
+	Nspeed,
+	Ntrack,
+	Ndate,
 } rmc_stages;
 
 typedef enum

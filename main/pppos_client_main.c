@@ -29,7 +29,7 @@
 
 
 
-/* prender el sim sin que muera*/
+/* prender el SIM800L*/
 #include "driver/gpio.h"
 
 #define SIM800l_PWR_KEY (4)
@@ -95,6 +95,96 @@ uint8_t puerta_c = 0;
 e_Puerta puerta_b = 0;
 
 
+//uart echo
+
+#define TX1 														27                                                                //
+#define RX1 														26
+#define LED 														13
+#define EX_UART_NUM 												UART_NUM_0
+#define PATTERN_CHR_NUM    											3        /*!< Set the number of consecutive and identical characters received by receiver which defines a UART pattern*/
+#define BUF_SIZE 													1024
+#define RD_BUF_SIZE 												BUF_SIZE
+static QueueHandle_t uart0_queue;
+static QueueHandle_t uart1_queue;
+static QueueHandle_t Cola;
+static QueueHandle_t Cola1;
+
+struct TRAMA{
+	uint8_t dato[BUF_SIZE];
+	uint16_t size;
+};
+
+static void uart_event_task(void *pvParameters)
+{
+   uart_event_t event;
+   struct TRAMA TX;
+
+    for(;;) {
+
+       if(xQueueReceive(uart0_queue, (void * )&event, (portTickType)portMAX_DELAY)) {
+            bzero(TX.dato, RD_BUF_SIZE);
+
+            switch(event.type) {
+                case UART_DATA:
+
+                    TX.size=(uint16_t)event.size;
+                    uart_read_bytes(EX_UART_NUM, TX.dato, TX.size, portMAX_DELAY);
+                    xQueueSend(Cola,&TX,0/portTICK_RATE_MS);
+                    break;
+                default:
+                    ESP_LOGI(TAG, "uart event type: %d", event.type);
+                    break;
+            }
+        }
+    }
+    vTaskDelete(NULL);
+}
+
+static void uart1_event_task(void *pvParameters)
+{
+   uart_event_t event;
+   struct TRAMA TX;
+
+    for(;;) {
+
+       if(xQueueReceive(uart1_queue, (void * )&event, (portTickType)portMAX_DELAY)) {
+            bzero(TX.dato, RD_BUF_SIZE);
+
+            switch(event.type) {
+                case UART_DATA:
+                    TX.size=(uint16_t)event.size;
+                    uart_read_bytes(UART_NUM_1, TX.dato, TX.size, portMAX_DELAY);
+                    xQueueSend(Cola1,&TX,0/portTICK_RATE_MS);
+                    break;
+                default:
+                    ESP_LOGI(TAG, "uart event type: %d", event.type);
+                    break;
+            }
+        }
+    }
+    vTaskDelete(NULL);
+}
+
+static void task2(void *pvParameters){
+	struct TRAMA RX;
+	  	  for(;;) {
+	  		xQueueReceive(Cola,&RX,portMAX_DELAY);
+	  		uart_write_bytes(UART_NUM_1, (const char*)RX.dato, RX.size);
+
+	  	  	  }
+	    vTaskDelete(NULL);
+}
+
+static void task3(void *pvParameters){
+	struct TRAMA RX;
+	  	  for(;;) {
+	  		xQueueReceive(Cola1,&RX,portMAX_DELAY);
+	  		uart_write_bytes(UART_NUM_0, (const char*)RX.dato, RX.size);
+
+	  	  	  }
+	    vTaskDelete(NULL);
+}
+
 
 //Escribir en la memoria flash
 void set_form_flash_init( message_data_t *datos){
@@ -122,188 +212,6 @@ void set_form_flash_init( message_data_t *datos){
 }
 
 
-
-#if CONFIG_EXAMPLE_SEND_MSG
-/**
- * @brief This example will also show how to send short message using the infrastructure provided by esp modem library.
- * @note Not all modem support SMG.
- *
- */
-static esp_err_t example_default_handle(modem_dce_t *dce, const char *line)
-{
-    esp_err_t err = ESP_FAIL;
-    if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
-        err = esp_modem_process_command_done(dce, MODEM_STATE_SUCCESS);
-    } else if (strstr(line, MODEM_RESULT_CODE_ERROR)) {
-        err = esp_modem_process_command_done(dce, MODEM_STATE_FAIL);
-    }
-    return err;
-}
-
-
-static esp_err_t example_handle_cmgs(modem_dce_t *dce, const char *line)
-{
-    esp_err_t err = ESP_FAIL;
-    if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
-        err = esp_modem_process_command_done(dce, MODEM_STATE_SUCCESS);
-    } else if (strstr(line, MODEM_RESULT_CODE_ERROR)) {
-        err = esp_modem_process_command_done(dce, MODEM_STATE_FAIL);
-    } else if (!strncmp(line, "+CMGS", strlen("+CMGS"))) {
-        err = ESP_OK;
-    }
-    return err;
-}
-
-#define MODEM_SMS_MAX_LENGTH (128)
-#define MODEM_COMMAND_TIMEOUT_SMS_MS (120000)
-#define MODEM_PROMPT_TIMEOUT_MS (10)
-
-static esp_err_t example_send_message_text(modem_dce_t *dce, const char *phone_num, const char *text)
-{
-    modem_dte_t *dte = dce->dte;
-    dce->handle_line = example_default_handle;
-    /* Set text mode */
-    if (dte->send_cmd(dte, "AT+CMGF=1\r", MODEM_COMMAND_TIMEOUT_DEFAULT) != ESP_OK) {
-        ESP_LOGE(TAG, "send command failed");
-        goto err;
-    }
-    if (dce->state != MODEM_STATE_SUCCESS) {
-        ESP_LOGE(TAG, "set message format failed");
-        goto err;
-    }
-    ESP_LOGD(TAG, "set message format ok");
-    /* Specify character set */
-    dce->handle_line = example_default_handle;
-    if (dte->send_cmd(dte, "AT+CSCS=\"GSM\"\r", MODEM_COMMAND_TIMEOUT_DEFAULT) != ESP_OK) {
-        ESP_LOGE(TAG, "send command failed");
-        goto err;
-    }
-    if (dce->state != MODEM_STATE_SUCCESS) {
-        ESP_LOGE(TAG, "set character set failed");
-        goto err;
-    }
-    ESP_LOGD(TAG, "set character set ok");
-    /* send message */
-    char command[MODEM_SMS_MAX_LENGTH] = {0};
-    int length = snprintf(command, MODEM_SMS_MAX_LENGTH, "AT+CMGS=\"%s\"\r", phone_num);
-    /* set phone number and wait for "> " */
-    dte->send_wait(dte, command, length, "\r\n> ", MODEM_PROMPT_TIMEOUT_MS);
-    /* end with CTRL+Z */
-    snprintf(command, MODEM_SMS_MAX_LENGTH, "%s\x1A", text);
-    dce->handle_line = example_handle_cmgs;
-    if (dte->send_cmd(dte, command, MODEM_COMMAND_TIMEOUT_SMS_MS) != ESP_OK) {
-        ESP_LOGE(TAG, "send command failed");
-        goto err;
-    }
-    if (dce->state != MODEM_STATE_SUCCESS) {
-        ESP_LOGE(TAG, "send message failed");
-        goto err;
-    }
-    ESP_LOGD(TAG, "send message ok");
-    return ESP_OK;
-err:
-    return ESP_FAIL;
-}
-#endif
-
-static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    switch (event_id) {
-    case ESP_MODEM_EVENT_PPP_START:
-        ESP_LOGI(TAG, "Modem PPP Started");
-        break;
-    case ESP_MODEM_EVENT_PPP_STOP:
-        ESP_LOGI(TAG, "Modem PPP Stopped");
-        xEventGroupSetBits(event_group, STOP_BIT);
-        break;
-    case ESP_MODEM_EVENT_UNKNOWN:
-        ESP_LOGW(TAG, "Unknow line received: %s", (char *)event_data);
-        break;
-    default:
-        break;
-    }
-}
-
-static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
-{
-    esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
-    switch (event->event_id) {
-    case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-        msg_id = esp_mqtt_client_subscribe(client, "/topic/esp-pppos", 0);
-        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-        break;
-    case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-        break;
-    case MQTT_EVENT_SUBSCRIBED:
-        ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-        msg_id = esp_mqtt_client_publish(client, "/topic/esp-pppos", "esp32-pppos", 0, 0, 0);
-        ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
-        break;
-    case MQTT_EVENT_UNSUBSCRIBED:
-        ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-        break;
-    case MQTT_EVENT_PUBLISHED:
-        ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-        break;
-    case MQTT_EVENT_DATA:
-        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-        printf("DATA=%.*s\r\n", event->data_len, event->data);
-        xEventGroupSetBits(event_group, GOT_DATA_BIT);
-        break;
-    case MQTT_EVENT_ERROR:
-        ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
-        break;
-    default:
-        ESP_LOGI(TAG, "MQTT other event id: %d", event->event_id);
-        break;
-    }
-    return ESP_OK;
-}
-
-static void on_ppp_changed(void *arg, esp_event_base_t event_base,
-                        int32_t event_id, void *event_data)
-{
-    ESP_LOGI(TAG, "PPP state changed event %d", event_id);
-    if (event_id == NETIF_PPP_ERRORUSER) {
-        /* User interrupted event from esp-netif */
-        esp_netif_t *netif = event_data;
-        ESP_LOGI(TAG, "User interrupted event from netif:%p", netif);
-    }
-}
-
-
-static void on_ip_event(void *arg, esp_event_base_t event_base,
-                      int32_t event_id, void *event_data)
-{
-    ESP_LOGI(TAG, "IP event! %d", event_id);
-    if (event_id == IP_EVENT_PPP_GOT_IP) {
-        esp_netif_dns_info_t dns_info;
-
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        esp_netif_t *netif = event->esp_netif;
-
-        ESP_LOGI(TAG, "Modem Connect to PPP Server");
-        ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
-        ESP_LOGI(TAG, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
-        ESP_LOGI(TAG, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
-        ESP_LOGI(TAG, "Gateway     : " IPSTR, IP2STR(&event->ip_info.ip));
-        esp_netif_get_dns_info(netif, 0, &dns_info);
-        ESP_LOGI(TAG, "Name Server1: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        esp_netif_get_dns_info(netif, 1, &dns_info);
-        ESP_LOGI(TAG, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
-        xEventGroupSetBits(event_group, CONNECT_BIT);
-
-        ESP_LOGI(TAG, "GOT ip event!!!");
-    } else if (event_id == IP_EVENT_PPP_LOST_IP) {
-        ESP_LOGI(TAG, "Modem Disconnect from PPP Server");
-    }
-}
-
 void Mandar_mensaje(void *P)
 {
 	char message[318] = "Welcome to ESP32!";
@@ -313,7 +221,7 @@ void Mandar_mensaje(void *P)
 	uint8_t buf[BUF_SIZE];
 	const char* finalSMSComand = "\x1A";
 
-    uart_config_t uart_config = {
+ /*   uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
@@ -324,7 +232,7 @@ void Mandar_mensaje(void *P)
 
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, MEN_TXD, MEN_RXD, MEN_RTS, MEN_CTS);
-    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0); */
 
 	printf("Entre en mandar mensaje \r\n");
 	for(;;){
@@ -374,40 +282,46 @@ void Mandar_mensaje(void *P)
 
         // Se activan las funcionalidades
         uart_write_bytes(UART_NUM_1,"AT+CFUN=1\r\n", 11);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        ESP_LOGW(TAG, "CFUN activo \r\n");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
 
         //Para conectarse a la red de Movistar
         uart_write_bytes(UART_NUM_1,"AT+CSTT=\"internet.movistar.ve\",\"\",\"\"", 38);
+        ESP_LOGW(TAG, "Conectandose a movistar \r\n");
 
-
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(4000 / portTICK_PERIOD_MS);
 
         // Para activar la conexion inalambrica por GPRS
 		uart_write_bytes(UART_NUM_1,"AT+CIICR\r\n", 10);
+	     ESP_LOGW(TAG, "Ciirc activando \r\n");
 
-        vTaskDelay(8000 / portTICK_PERIOD_MS);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
 
         //Para configurar el formato de los mensajes
         uart_write_bytes(UART_NUM_1,"AT+CMGF=1\r\n", 11);
         vTaskDelay(100 / portTICK_PERIOD_MS);
+        ESP_LOGW(TAG, "Cmgf activo \r\n");
 
         // Para pedir la ip asignada
     	uart_write_bytes(UART_NUM_1,"AT+CIFSR\r\n", 10);
         vTaskDelay(100 / portTICK_PERIOD_MS);
+        ESP_LOGW(TAG, "Pidiendo IP \r\n");
 
     	//Verificando si ya se le asigno ip
     	uart_read_bytes(UART_NUM_1, (uint8_t*)buf, BUF_SIZE, pdMS_TO_TICKS(10));
+        ESP_LOGW(TAG, "Verificando IP \r\n");
 
 
-    	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584241748149\"", 24);
-
+    	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584241748149\"", 23);
+        ESP_LOGW(TAG, "Mensaje1 \r\n");
         vTaskDelay(500 / portTICK_PERIOD_MS);
-        sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-        uart_write_bytes(UART_NUM_1,message, 51);
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-        uart_write_bytes(UART_NUM_1,"\x1A", 1);
+        sprintf(message,"Esta es una prueba \r\n");
+        uart_write_bytes(UART_NUM_1,message, 21);
+        uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 1);
+        ESP_LOGW(TAG, "Mensaje2 \r\n");
 
-
+        ESP_LOGI(TAG, "Mande los mensajessssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss \r\n");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
 
 
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
@@ -566,6 +480,47 @@ void app_main(void)
 	        nvs_close(my_handle);
 	    }
 
+		Cola= xQueueCreate(1, sizeof(struct TRAMA));
+		Cola1= xQueueCreate(1, sizeof(struct TRAMA));
+
+	    uart_config_t uart_config = {
+	        .baud_rate = 115200,
+	        .data_bits = UART_DATA_8_BITS,
+	        .parity    = UART_PARITY_DISABLE,
+	        .stop_bits = UART_STOP_BITS_1,
+	        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+	        .source_clk = UART_SCLK_APB,
+	    };
+
+
+	    uart_driver_install(UART_NUM_1, BUF_SIZE, BUF_SIZE, 20, &uart1_queue, 0);
+	     uart_param_config(UART_NUM_1, &uart_config);
+	     //Install UART driver, and get the queue.
+	     uart_driver_install(EX_UART_NUM, BUF_SIZE, BUF_SIZE, 20, &uart0_queue, 0);
+	     uart_param_config(EX_UART_NUM, &uart_config);
+
+	     //Install UART driver, and get the queue.
+
+
+	     //Set UART log level
+	     esp_log_level_set(TAG, ESP_LOG_INFO);
+	     //Set UART pins (using UART0 default pins ie no changes.)
+	     uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+	     //Set UART pins (using UART1 default pins ie no changes.)
+	     uart_set_pin(UART_NUM_1, TX1, RX1, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+	     //Set uart pattern detect function.
+	    // uart_enable_pattern_det_baud_intr(EX_UART_NUM, '+', PATTERN_CHR_NUM, 9, 0, 0);
+	     //Reset the pattern queue length to record at most 20 pattern positions.
+	   //  uart_pattern_queue_reset(EX_UART_NUM, 20);
+
+	     //Create a task to handler UART event from ISR
+	    // xTaskCreate(task_test, "tarea de prueba", 3*1024, NULL, 2, &xTask2Handle);
+	     xTaskCreate(task2, "tarea de prueba", 4*1024, NULL, 2, NULL);
+	     xTaskCreate(task3, "tarea 3 de prueba", 4*1024, NULL, 2, NULL);
+	     xTaskCreate(uart_event_task, "uart_event_task", 10*2048, NULL, 1, NULL);
+	     xTaskCreate(uart1_event_task, "uart1_event_task", 10*2048, NULL, 1, NULL);
 
 
 
@@ -584,10 +539,6 @@ void app_main(void)
 	gpio_pad_select_gpio(GPIO_NUM_14);
 	gpio_set_direction(GPIO_NUM_14, GPIO_MODE_INPUT);
 
-	//Para usar un led indicador de etapa
-	gpio_pad_select_gpio(GPIO_NUM_27);
-	gpio_set_direction(GPIO_NUM_27, GPIO_MODE_OUTPUT);
-	gpio_set_level(GPIO_NUM_27, 0);
 
 	//Creo el grupo de eventos y las colas
 	event_group = xEventGroupCreate();
@@ -595,9 +546,9 @@ void app_main(void)
 	xQueue_gps = xQueueCreate(1, sizeof(gps_data_t));
 
 
-	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*3, NULL, 5, NULL,0);
+	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*4, NULL, 5, NULL,0);
 	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 5, NULL,1);
-	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje2", 1024*6, NULL, 6, NULL,1);
+	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje2", 1024*7, NULL, 6, NULL,1);
 //	La tarea dht se inicia en sync desde mandar mensaje
 	xEventGroupSetBits(event_group, BEGIN_TASK2);
 

@@ -544,10 +544,10 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
         .source_clk = UART_SCLK_APB,
     };
  //   ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
-    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
+/*    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, ECHO_TEST_RTS, ECHO_TEST_CTS);
-
+*/
  //   ESP_LOGI(TAG1, "Uart 0 Iniciado");
  //   ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
 
@@ -759,7 +759,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        	case 2:
     	        	    //Entrara aca despues de mandar AT+GPSRD=1
     	        	    //En este ciclo se encarga de separar las oraciones del bus NMEA del GPS
-    	        			ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
+    	        		//	ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
     	        			auxi2_echo = 1;
 
     	        			int i2 = 0;

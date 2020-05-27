@@ -7,6 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #include "dht.h"
+#include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -22,7 +23,6 @@
 #include "sim800.h"
 #include "bg96.h"
 #include "nvs_flash.h"
-#include "freertos/queue.h"
 #include "tracking.h"
 #include "esp_sleep.h"
 #include "driver/rtc_io.h"
@@ -102,43 +102,18 @@ e_Puerta puerta_b = 0;
 #define LED 														13
 #define EX_UART_NUM 												UART_NUM_0
 #define PATTERN_CHR_NUM    											3        /*!< Set the number of consecutive and identical characters received by receiver which defines a UART pattern*/
-#define BUF_SIZE 													1024
 #define RD_BUF_SIZE 												BUF_SIZE
-static QueueHandle_t uart0_queue;
+
 static QueueHandle_t uart1_queue;
-static QueueHandle_t Cola;
 static QueueHandle_t Cola1;
+static QueueHandle_t Datos_uart1;
 
 struct TRAMA{
 	uint8_t dato[BUF_SIZE];
 	uint16_t size;
 };
 
-static void uart_event_task(void *pvParameters)
-{
-   uart_event_t event;
-   struct TRAMA TX;
 
-    for(;;) {
-
-       if(xQueueReceive(uart0_queue, (void * )&event, (portTickType)portMAX_DELAY)) {
-            bzero(TX.dato, RD_BUF_SIZE);
-
-            switch(event.type) {
-                case UART_DATA:
-
-                    TX.size=(uint16_t)event.size;
-                    uart_read_bytes(EX_UART_NUM, TX.dato, TX.size, portMAX_DELAY);
-                    xQueueSend(Cola,&TX,0/portTICK_RATE_MS);
-                    break;
-                default:
-                    ESP_LOGI(TAG, "uart event type: %d", event.type);
-                    break;
-            }
-        }
-    }
-    vTaskDelete(NULL);
-}
 
 static void uart1_event_task(void *pvParameters)
 {
@@ -148,12 +123,13 @@ static void uart1_event_task(void *pvParameters)
     for(;;) {
 
        if(xQueueReceive(uart1_queue, (void * )&event, (portTickType)portMAX_DELAY)) {
-            bzero(TX.dato, RD_BUF_SIZE);
+            bzero(TX.dato,RD_BUF_SIZE);
 
             switch(event.type) {
                 case UART_DATA:
                     TX.size=(uint16_t)event.size;
                     uart_read_bytes(UART_NUM_1, TX.dato, TX.size, portMAX_DELAY);
+                    xQueueSend(Datos_uart1,&TX,0/portTICK_RATE_MS);
                     xQueueSend(Cola1,&TX,0/portTICK_RATE_MS);
                     break;
                 default:
@@ -165,17 +141,7 @@ static void uart1_event_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-static void task2(void *pvParameters){
-	struct TRAMA RX;
-	  	  for(;;) {
-	  		xQueueReceive(Cola,&RX,portMAX_DELAY);
-	  		uart_write_bytes(UART_NUM_1, (const char*)RX.dato, RX.size);
-
-	  	  	  }
-	    vTaskDelete(NULL);
-}
-
-static void task3(void *pvParameters){
+static void echo_U1to0(void *pvParameters){
 	struct TRAMA RX;
 	  	  for(;;) {
 	  		xQueueReceive(Cola1,&RX,portMAX_DELAY);
@@ -184,6 +150,57 @@ static void task3(void *pvParameters){
 	  	  	  }
 	    vTaskDelete(NULL);
 }
+
+static void  Tiempo_Espera(char* aux, uint8_t estado, uint16_t* tamano, uint8_t* error, portTickType tiempo)
+{
+	//Esta funcion se encarga de esperar el tiempo necesario para cada comando
+	// Creo que se le puede anadir en el else la parte de los errores
+	struct TRAMA buf;
+    if(xQueueReceive(Datos_uart1, &buf, (portTickType) tiempo / portTICK_PERIOD_MS)) {
+        memcpy(aux,buf.dato,BUF_SIZE);
+        *tamano = buf.size;
+        ESP_LOGW(TAG,"Size es: %d",buf.size);
+        ESP_LOGW(TAG,"aux es: %s",buf.dato);
+    } else {
+    	printf("%d- Espere %d y nada",estado,(int) tiempo);
+    	error++;
+    }
+}
+
+static void  Prender_SIM800l()
+{
+
+	gpio_set_level(SIM800l_PWR, 1);
+	gpio_set_level(SIM800l_RST, 1);
+	gpio_set_level(SIM800l_PWR_KEY, 1);
+	vTaskDelay(1000 / portTICK_PERIOD_MS);
+	gpio_set_level(SIM800l_PWR_KEY, 0);
+	vTaskDelay(1000 / portTICK_PERIOD_MS);
+	gpio_set_level(SIM800l_PWR_KEY, 1);
+
+
+	vTaskDelay(5000 / portTICK_PERIOD_MS);
+//	ESP_LOGW("TAG","Ya espere 10");
+}
+
+static void  Enviar_mensaje(char* mensaje, uint8_t tamano)
+{
+	char aux[BUF_SIZE] = "32!";
+	uint16_t size = 0;
+	uint8_t error = 0;
+	const char* finalSMSComand = "\x1A";
+	ESP_LOGW("Mensaje","Mandare el mensaje");
+	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584242428865\"\r\n", 25);
+	Tiempo_Espera(aux, 20,&size,error, t_CMGS);
+	if(strncmp(aux,"\r\n>",3) == 0){
+	    uart_write_bytes(UART_NUM_1,mensaje,tamano);
+	    uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 2);
+	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+		ESP_LOGE("Mensaje","No se pudo mandar el mensaje");
+	}
+}
+
+
 
 
 //Escribir en la memoria flash
@@ -215,24 +232,18 @@ void set_form_flash_init( message_data_t *datos){
 void Mandar_mensaje(void *P)
 {
 	char message[318] = "Welcome to ESP32!";
+	char aux[BUF_SIZE] = "";
+	uint16_t size = 0;
+	e_ATCOM ATCOM = 0;
+	e_TEspera T_Espera;
 	gps_data_t gps_data2;
 	AM2301_data_t Thum2;
 	message_data_t message_data;
-	uint8_t buf[BUF_SIZE];
-	const char* finalSMSComand = "\x1A";
+	uint8_t flags_errores = 0;
+	uint8_t flags2_errores = 0;
+	uint8_t config_sim800 = 0;
 
- /*   uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-    };
 
-    uart_param_config(UART_NUM_1, &uart_config);
-    uart_set_pin(UART_NUM_1, MEN_TXD, MEN_RXD, MEN_RTS, MEN_CTS);
-    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0); */
 
 	printf("Entre en mandar mensaje \r\n");
 	for(;;){
@@ -241,112 +252,145 @@ void Mandar_mensaje(void *P)
 	   	xEventGroupClearBits(event_group, SYNC_BIT_TASK1);
 	    xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
 
-	    /* Power down module */
-//	    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
-//	    vTaskDelay(1000 / portTICK_PERIOD_MS);
+	    ESP_LOGW(TAG, "Apagare y prendere\r\n");
+	    /* Apagar el modulo por si esta prendido al entrar en la tarea */
+	    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+	    vTaskDelay(2000 / portTICK_PERIOD_MS);
+	    Prender_SIM800l();
 
+	    ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
 	    //Recibo la informacion de la temperatura
-    	xQueueReceive(xQueue_temp,&Thum2,portMAX_DELAY);
-    	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
-    	sprintf(message_data.Temperatura, "%f",Thum2.Prom_temp[Thum2.pos_temp-1]);
+	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 1000 / portTICK_PERIOD_MS)) {
+	    	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
+	    	sprintf(message_data.Temperatura, "%f",Thum2.Prom_temp[Thum2.pos_temp-1]);
+	    } else {
+	    	Thum2.error_temp = 1;
+	    }
 
     	//Recibo la informacion del gps
-    	xQueueReceive(xQueue_gps,&gps_data2,portMAX_DELAY);
-    	sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
-    	sprintf(message_data.Longitude, "%f",gps_data2.longitude_prom);
-    	sprintf(message_data.Latitude_dir, "%s",gps_data2.latitude_direct);
-    	sprintf(message_data.Longitude_dir, "%s",gps_data2.longitude_direct);
+	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 1000 / portTICK_PERIOD_MS)) {
+	    	sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
+	    	sprintf(message_data.Longitude, "%f",gps_data2.longitude_prom);
+	    	sprintf(message_data.Latitude_dir, "%s",gps_data2.latitude_direct);
+	    	sprintf(message_data.Longitude_dir, "%s",gps_data2.longitude_direct);
+	    } else {
+	    	gps_data2.error_gps = 1;
+	    }
+
 
     	//Verifico si se supero el limite de temperatura o se abrio la puerta para guardar la informacion
     	//en la memoria flash
     	if (limite_b == 1 || puerta_b == 1){
         		set_form_flash_init(&message_data);
         	}
-
-        /* Configurar los niveles de las salidas y el pulso necesario para prender el SIM800l*/
-        gpio_set_level(SIM800l_PWR, 1);
-        gpio_set_level(SIM800l_RST, 1);
-        gpio_set_level(SIM800l_PWR_KEY, 1);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        gpio_set_level(SIM800l_PWR_KEY, 0);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        gpio_set_level(SIM800l_PWR_KEY, 1);
-
-
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-
-
+    	ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
     /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
      y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
      * */
-
-        // Se activan las funcionalidades
-        uart_write_bytes(UART_NUM_1,"AT+CFUN=1\r\n", 11);
-        ESP_LOGW(TAG, "CFUN activo \r\n");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-        //Para conectarse a la red de Movistar
-        uart_write_bytes(UART_NUM_1,"AT+CSTT=\"internet.movistar.ve\",\"\",\"\"", 38);
-        ESP_LOGW(TAG, "Conectandose a movistar \r\n");
-
-        vTaskDelay(4000 / portTICK_PERIOD_MS);
-
-        // Para activar la conexion inalambrica por GPRS
-		uart_write_bytes(UART_NUM_1,"AT+CIICR\r\n", 10);
-	     ESP_LOGW(TAG, "Ciirc activando \r\n");
-
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
-
-        //Para configurar el formato de los mensajes
-        uart_write_bytes(UART_NUM_1,"AT+CMGF=1\r\n", 11);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        ESP_LOGW(TAG, "Cmgf activo \r\n");
-
-        // Para pedir la ip asignada
-    	uart_write_bytes(UART_NUM_1,"AT+CIFSR\r\n", 10);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        ESP_LOGW(TAG, "Pidiendo IP \r\n");
-
-    	//Verificando si ya se le asigno ip
-    	uart_read_bytes(UART_NUM_1, (uint8_t*)buf, BUF_SIZE, pdMS_TO_TICKS(10));
-        ESP_LOGW(TAG, "Verificando IP \r\n");
-
-
-    	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584241748149\"", 23);
-        ESP_LOGW(TAG, "Mensaje1 \r\n");
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-        sprintf(message,"Esta es una prueba \r\n");
-        uart_write_bytes(UART_NUM_1,message, 21);
-        uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 1);
-        ESP_LOGW(TAG, "Mensaje2 \r\n");
-
-        ESP_LOGI(TAG, "Mande los mensajessssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss \r\n");
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    while(config_sim800 == 0){
+    	switch (ATCOM){
+    	case CMGF:
+            //Para configurar el formato de los mensajes
+            uart_write_bytes(UART_NUM_1,"AT+CMGF=1\r\n", 11);
+            ESP_LOGW(TAG, "Cmgf activo \r\n");
+            Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CMGF);
+            if(strncmp(aux,"\r\nOK",4) == 0){
+            	ATCOM++;
+                ESP_LOGW(TAG,"Aumentando ATCOM");
+                flags_errores = 0;
+            }else if(strncmp(aux,"\r\nERROR",7) == 0){
+            	ESP_LOGE(TAG,"CMGF- Dio Error");
+            	flags_errores++;
+            	if (flags_errores >= 3){
+            		ATCOM = CPOWD;
+            	}
+            }
+            bzero(aux, BUF_SIZE);
+            size = 0;
+    	break;
+    	case CPAS:
+    		// Verificar que se encuentra conectado a la radio base
+    		uart_write_bytes(UART_NUM_1,"AT+CPAS\r\n", 9);
+	        ESP_LOGW(TAG, "Mande CPAS \r\n");
+	        Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CPAS);
+	        if(strncmp(aux,"\r\n+CPAS: 0",10) == 0){
+	        	ESP_LOGE(TAG,"CPAS- Respondio bien");
+	        	config_sim800 = 1;
+           		flags_errores = 0;
+	        }else if(strncmp(aux,"\r\nERROR",7) == 0){
+	        	ESP_LOGE(TAG,"CPAS- Dio Error");
+	        	flags_errores++;
+	        	if (flags_errores >= 3){
+	        		ATCOM = CPOWD;
+	        	}
+           }
+           bzero(aux, BUF_SIZE);
+           size = 0;
+        break;
+       	case CPOWD:
+        	//Para apagar el sim800l
+            ESP_LOGW(TAG, "Apagar \r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+            Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CPOWD);
+            if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+               	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	if (flags_errores >= 3){
+            		flags_errores = 0;
+            		Prender_SIM800l();
+	            	vTaskDelay(5000 / portTICK_PERIOD_MS);
+	            	ATCOM = CMGF;
+            	} else{
+               	config_sim800 = 1;
+               	flags_errores = 0;
+            	}
+            }else {
+            	ESP_LOGE(TAG,"CPOWD- Dio Error");
+            	flags_errores++;
+            	if (flags_errores >= 3){
+            		flags2_errores = 1;
+            		flags_errores = 0;
+            	}
+            }
+            bzero(aux, BUF_SIZE);
+            size = 0;
+        break;
+    	}
+    	ESP_LOGW(TAG,"Final del while");
+    	vTaskDelay(1000 / portTICK_PERIOD_MS);
+    	//verificacion por si dio error en el envio del apagado
+    	//Esto puede ser usado tambien en otros casos para salir del ciclo
+    	if ( flags2_errores == 1){
+    		flags2_errores = 0;
+    		break;
+    	}
+    }
+    	ATCOM = CMGF;
+    	config_sim800 = 0;
 
 
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
 
     if (Thum2.error_temp == 0){
-	switch(limite_b){
-	 case 0:
-		 sprintf(message,"La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
-	 break;
-	 case 1:
-
-		 sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
-		if (limite_a == 0){
+    	switch(limite_b){
+    	case 0:
+    		sprintf(message,"La humedad es: %.1f %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+    		Enviar_mensaje(message,48);
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    	break;
+    	case 1:
+    		sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
+    		Enviar_mensaje(message,89);
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    		if (limite_a == 0){
 			limite_b = 0;
-		}
-	break;
-	}
+    		}
+    	break;
+    	}
     } else {
     	Thum.error_temp = 0;
-
     	 sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
+    	 Enviar_mensaje(message,57);
     	 ESP_LOGI(TAG, "Send send message [%s] ok", message);
-
     }
 
     switch (puerta_b){
@@ -356,20 +400,23 @@ void Mandar_mensaje(void *P)
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
         	if (gps_data2.year == 20){
 			    sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
-        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-
+		    	Enviar_mensaje(message,87);
+			    ESP_LOGI(TAG, "Send send message [%s] ok", message);
 
         		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
+        		Enviar_mensaje(message,112);
         		ESP_LOGI(TAG, "Send send message [%s] ok", message);
         	} else{
 
         		 sprintf(message,"No se logro conectar a la red GPS.");
+        		 Enviar_mensaje(message,34);
         		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
         	}
         } else{
   			gps_data.error_gps = 0;
-    		 sprintf(message,"No se logro conectar con el modulo GPS.");
-    		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    		sprintf(message,"No se logro conectar con el modulo GPS.");
+    		Enviar_mensaje(message,39);
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
         }
     break;
     case P_abierta:
@@ -379,6 +426,7 @@ void Mandar_mensaje(void *P)
     		if (gps_data2.year == 20){
 
     			 sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
+    			 Enviar_mensaje(message,87);
     			 ESP_LOGI(TAG, "Send send message [%s] ok", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
@@ -386,10 +434,12 @@ void Mandar_mensaje(void *P)
     			}
 
     	         sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
+    	         Enviar_mensaje(message,112);
     	         ESP_LOGI(TAG, "Send send message [%s] ok", message);
     	    } else{
 
     	    	 sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
+    	    	 Enviar_mensaje(message,59);
     	    	 ESP_LOGI(TAG, "Send send message [%s] ok", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
@@ -398,8 +448,8 @@ void Mandar_mensaje(void *P)
     	    }
     	} else{
 			gps_data.error_gps = 0;
-
 			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
+			Enviar_mensaje(message,64);
 			ESP_LOGI(TAG, "Send send message [%s] ok", message);
 			if (puerta_a == 0){
 				puerta_b = 0;
@@ -413,6 +463,7 @@ void Mandar_mensaje(void *P)
 
     /* Power down module */
     ESP_LOGI(TAG, "Power down");
+    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 	}
 }
@@ -480,8 +531,8 @@ void app_main(void)
 	        nvs_close(my_handle);
 	    }
 
-		Cola= xQueueCreate(1, sizeof(struct TRAMA));
 		Cola1= xQueueCreate(1, sizeof(struct TRAMA));
+		Datos_uart1 = xQueueCreate(1, sizeof(struct TRAMA));
 
 	    uart_config_t uart_config = {
 	        .baud_rate = 115200,
@@ -494,33 +545,23 @@ void app_main(void)
 
 
 	    uart_driver_install(UART_NUM_1, BUF_SIZE, BUF_SIZE, 20, &uart1_queue, 0);
-	     uart_param_config(UART_NUM_1, &uart_config);
-	     //Install UART driver, and get the queue.
-	     uart_driver_install(EX_UART_NUM, BUF_SIZE, BUF_SIZE, 20, &uart0_queue, 0);
-	     uart_param_config(EX_UART_NUM, &uart_config);
+	    uart_param_config(UART_NUM_1, &uart_config);
+	    //Install UART driver, and get the queue.
+	    uart_driver_install(EX_UART_NUM, BUF_SIZE, BUF_SIZE, 20, NULL, 0);
+	    uart_param_config(EX_UART_NUM, &uart_config);
+	    //Install UART driver, and get the queue.
+	    //Set UART log level
+	    esp_log_level_set(TAG, ESP_LOG_INFO);
+	    //Set UART pins (using UART0 default pins ie no changes.)
+	    uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+	    //Set UART pins (using UART1 default pins ie no changes.)
+	    uart_set_pin(UART_NUM_1, TX1, RX1, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-	     //Install UART driver, and get the queue.
-
-
-	     //Set UART log level
-	     esp_log_level_set(TAG, ESP_LOG_INFO);
-	     //Set UART pins (using UART0 default pins ie no changes.)
-	     uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-
-	     //Set UART pins (using UART1 default pins ie no changes.)
-	     uart_set_pin(UART_NUM_1, TX1, RX1, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-
-	     //Set uart pattern detect function.
-	    // uart_enable_pattern_det_baud_intr(EX_UART_NUM, '+', PATTERN_CHR_NUM, 9, 0, 0);
-	     //Reset the pattern queue length to record at most 20 pattern positions.
-	   //  uart_pattern_queue_reset(EX_UART_NUM, 20);
 
 	     //Create a task to handler UART event from ISR
 	    // xTaskCreate(task_test, "tarea de prueba", 3*1024, NULL, 2, &xTask2Handle);
-	     xTaskCreate(task2, "tarea de prueba", 4*1024, NULL, 2, NULL);
-	     xTaskCreate(task3, "tarea 3 de prueba", 4*1024, NULL, 2, NULL);
-	     xTaskCreate(uart_event_task, "uart_event_task", 10*2048, NULL, 1, NULL);
-	     xTaskCreate(uart1_event_task, "uart1_event_task", 10*2048, NULL, 1, NULL);
+	    xTaskCreate(echo_U1to0, "Echo a uart0", 4*1024, NULL, 2, NULL);
+	    xTaskCreate(uart1_event_task, "uart1_event_task", 10*2048, NULL, 1, NULL);
 
 
 
@@ -548,7 +589,7 @@ void app_main(void)
 
 	xTaskCreatePinnedToCore(&TareaDHT, "TareaDHT", 1024*4, NULL, 5, NULL,0);
 	xTaskCreatePinnedToCore(&echo_task, "uart_echo_task", 1024*8, NULL, 5, NULL,1);
-	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje2", 1024*7, NULL, 6, NULL,1);
+	xTaskCreatePinnedToCore(&Mandar_mensaje, "Mandar mensaje2", 1024*10, NULL, 6, NULL,1);
 //	La tarea dht se inicia en sync desde mandar mensaje
 	xEventGroupSetBits(event_group, BEGIN_TASK2);
 

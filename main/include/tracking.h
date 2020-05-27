@@ -24,6 +24,50 @@ typedef struct {
     char Temperatura[319];
 
 } message_data_t;
+/*
+typedef enum
+{
+	CFUN = 0,
+	CSTT,
+    CIICR,
+	CGREG,
+	CMGF,
+	CIFSR,
+	CPAS,
+	CMGS1,
+	CMGS,
+	CIPSTART,
+	CIPSTART2,
+	CIPSEND,
+	CIPSEND2,
+	CPOWD,
+} e_ATCOM;*/
+
+
+typedef enum
+{
+	CMGF = 0,
+	CPAS,
+/*	CMGS1,
+	CMGS2,*/
+	CPOWD,
+} e_ATCOM;
+
+//Enum para asignar los tiempos de espera para cada comando AT
+typedef enum {
+    t_CFUN = 12000,
+    t_CSST = 30000,
+    t_CIICR = 130000,
+    t_CGREG = 5000,
+    t_CMGF = 12000,
+    t_CIFSR = 5000,
+    t_CPAS = 5000,
+    t_CMGS = 60000,
+	t_CIPSTART = 162000,
+	t_CIPSEND = 647000,
+    t_CPOWD = 5000,
+} e_TEspera;
+
 
 
 

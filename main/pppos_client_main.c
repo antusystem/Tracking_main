@@ -117,6 +117,7 @@ struct TRAMA{
 
 static void uart1_event_task(void *pvParameters)
 {
+	//Esta tarea recibe por eventos lo que llega al uart y lo manda por cola
    uart_event_t event;
    struct TRAMA TX;
 
@@ -142,6 +143,7 @@ static void uart1_event_task(void *pvParameters)
 }
 
 static void echo_U1to0(void *pvParameters){
+	//Esta funcion hace el echo del uart 1 al uart0
 	struct TRAMA RX;
 	  	  for(;;) {
 	  		xQueueReceive(Cola1,&RX,portMAX_DELAY);
@@ -154,9 +156,9 @@ static void echo_U1to0(void *pvParameters){
 static void  Tiempo_Espera(char* aux, uint8_t estado, uint16_t* tamano, uint8_t* error, portTickType tiempo)
 {
 	//Esta funcion se encarga de esperar el tiempo necesario para cada comando
-	// Creo que se le puede anadir en el else la parte de los errores
 	struct TRAMA buf;
     if(xQueueReceive(Datos_uart1, &buf, (portTickType) tiempo / portTICK_PERIOD_MS)) {
+    //	fflush(UART_NUM_1);
         memcpy(aux,buf.dato,BUF_SIZE);
         *tamano = buf.size;
         ESP_LOGW(TAG,"Size es: %d",buf.size);
@@ -169,7 +171,7 @@ static void  Tiempo_Espera(char* aux, uint8_t estado, uint16_t* tamano, uint8_t*
 
 static void  Prender_SIM800l()
 {
-
+	// Esta funcion prende el modulo sim800 y le da un tiempo para que se conecte a la radiobase
 	gpio_set_level(SIM800l_PWR, 1);
 	gpio_set_level(SIM800l_RST, 1);
 	gpio_set_level(SIM800l_PWR_KEY, 1);
@@ -179,25 +181,48 @@ static void  Prender_SIM800l()
 	gpio_set_level(SIM800l_PWR_KEY, 1);
 
 
-	vTaskDelay(5000 / portTICK_PERIOD_MS);
+	vTaskDelay(7000 / portTICK_PERIOD_MS);
 //	ESP_LOGW("TAG","Ya espere 10");
 }
 
 static void  Enviar_mensaje(char* mensaje, uint8_t tamano)
 {
+	//Esta funcion enviara el mensaje que se le pase
 	char aux[BUF_SIZE] = "32!";
 	uint16_t size = 0;
-	uint8_t error = 0;
+	uint8_t error = 0, jail = 0;
 	const char* finalSMSComand = "\x1A";
+	//Se manda el comando AT para comenzar el envio del mensaje
 	ESP_LOGW("Mensaje","Mandare el mensaje");
 	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584242428865\"\r\n", 25);
+	//Se espera la respuesta y luego se compara a ver si es la esperada
+	//La respuesta es "inmediata" asi que no deberia hacer falta ponerlo en un ciclo
 	Tiempo_Espera(aux, 20,&size,error, t_CMGS);
 	if(strncmp(aux,"\r\n>",3) == 0){
-	    uart_write_bytes(UART_NUM_1,mensaje,tamano);
-	    uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 2);
+		uart_write_bytes(UART_NUM_1,mensaje,tamano);
+		uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 2);
 	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
 		ESP_LOGE("Mensaje","No se pudo mandar el mensaje");
 	}
+    ESP_LOGW(TAG, "Mensaje2 \r\n");
+    //Aqui espero la respuesta al envio de mensaje para poder terminar la tarea y no molestar
+    // en el siguiente mensaje
+    while (jail == 0){
+    	Tiempo_Espera(aux, 21,&size,error,t_CMGS);
+    	if(strncmp(aux,"\r\n+CMGS:",8) == 0){
+    		jail = 1;
+    	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+    		ESP_LOGE(TAG,"21- Dio Error");
+    		error++;
+    		if (error >= 5){
+    			ESP_LOGE(TAG,"21- No se mando el mensaje Error");
+    			break;
+    		}
+    	}
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+	vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
 
@@ -241,6 +266,7 @@ void Mandar_mensaje(void *P)
 	message_data_t message_data;
 	uint8_t flags_errores = 0;
 	uint8_t flags2_errores = 0;
+	uint8_t flags3_errores = 0;
 	uint8_t config_sim800 = 0;
 
 
@@ -260,7 +286,7 @@ void Mandar_mensaje(void *P)
 
 	    ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
 	    //Recibo la informacion de la temperatura
-	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 1000 / portTICK_PERIOD_MS)) {
+	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 4000 / portTICK_PERIOD_MS)) {
 	    	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
 	    	sprintf(message_data.Temperatura, "%f",Thum2.Prom_temp[Thum2.pos_temp-1]);
 	    } else {
@@ -268,7 +294,7 @@ void Mandar_mensaje(void *P)
 	    }
 
     	//Recibo la informacion del gps
-	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 1000 / portTICK_PERIOD_MS)) {
+	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 1500 / portTICK_PERIOD_MS)) {
 	    	sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
 	    	sprintf(message_data.Longitude, "%f",gps_data2.longitude_prom);
 	    	sprintf(message_data.Latitude_dir, "%s",gps_data2.latitude_direct);
@@ -292,6 +318,7 @@ void Mandar_mensaje(void *P)
     	case CMGF:
             //Para configurar el formato de los mensajes
             uart_write_bytes(UART_NUM_1,"AT+CMGF=1\r\n", 11);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
             ESP_LOGW(TAG, "Cmgf activo \r\n");
             Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CMGF);
             if(strncmp(aux,"\r\nOK",4) == 0){
@@ -321,6 +348,11 @@ void Mandar_mensaje(void *P)
 	        	ESP_LOGE(TAG,"CPAS- Dio Error");
 	        	flags_errores++;
 	        	if (flags_errores >= 3){
+	        		ATCOM = CPOWD;
+	        	}
+           } else if(strncmp(aux,"\r\n+CPAS: 0",10) == 2 || strncmp(aux,"\r\n+CPAS: 1",10) == 0){
+        	   flags3_errores++;
+	        	if (flags3_errores >= 10){
 	        		ATCOM = CPOWD;
 	        	}
            }
@@ -388,9 +420,10 @@ void Mandar_mensaje(void *P)
     	}
     } else {
     	Thum.error_temp = 0;
-    	 sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
-    	 Enviar_mensaje(message,57);
-    	 ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
+    	Enviar_mensaje(message,57);
+
+    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
     }
 
     switch (puerta_b){

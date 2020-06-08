@@ -48,10 +48,28 @@ typedef enum
 {
 	CMGF = 0,
 	CPAS,
-/*	CMGS1,
-	CMGS2,*/
 	CPOWD,
 } e_ATCOM;
+
+typedef enum
+{
+	CFUN = 0,
+	CSTT,
+	CIICR,
+	CGREG,
+	CIFSR,
+	CPOWD2,
+} e_ATCOM2;
+
+typedef enum
+{
+	CIPSTART = 0,
+	CIPSTART2,
+	CIPSEND,
+	CIPSEND2,
+	CPOWD3,
+} e_ATCOM3;
+
 
 //Enum para asignar los tiempos de espera para cada comando AT
 typedef enum {

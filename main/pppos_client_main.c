@@ -187,20 +187,22 @@ static void  Prender_SIM800l()
 //	ESP_LOGW("TAG","Ya espere 10");
 }
 
-
-static void  Enviar_mensaje(char* mensaje, uint8_t tamano)
+static void  Envio_mensaje(char* mensaje, uint8_t tamano)
 {
 	//Esta funcion enviara el mensaje que se le pase
 	char aux[BUF_SIZE] = "32!";
 	uint16_t size = 0;
 	uint8_t error = 0, jail = 0;
 	const char* finalSMSComand = "\x1A";
+
 	//Se manda el comando AT para comenzar el envio del mensaje
 	ESP_LOGW("Mensaje","Mandare el mensaje");
 	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584242428865\"\r\n", 25);
+
 	//Se espera la respuesta y luego se compara a ver si es la esperada
 	//La respuesta es "inmediata" asi que no deberia hacer falta ponerlo en un ciclo
 	Tiempo_Espera(aux, 20,&size,error, t_CMGS);
+    vTaskDelay(300 / portTICK_PERIOD_MS);
 	if(strncmp(aux,"\r\n>",3) == 0){
 		uart_write_bytes(UART_NUM_1,mensaje,tamano);
 		uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 2);
@@ -222,10 +224,111 @@ static void  Enviar_mensaje(char* mensaje, uint8_t tamano)
     			break;
     		}
     	}
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    vTaskDelay(700 / portTICK_PERIOD_MS);
     }
 
 	vTaskDelay(1000 / portTICK_PERIOD_MS);
+}
+
+static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM, uint8_t* config)
+{
+	//Esta funcion de configurar el sim800 para enviar mensajes de texto
+	ATCOM = CMGF;
+	char aux[BUF_SIZE] = "!";
+	uint16_t size = 0;
+	uint8_t error = 0;
+	uint8_t flags_errores = 0, flags2_errores = 0, flags3_errores = 0;
+	//Cuando leia config  daba un valor incorrecto, asi que lo paso de nuevo aca, creo
+	//que se puede borrar config de afuera de esta funcion
+	config = 0;
+	ESP_LOGE(TAG, "config es %d \r\n",(int) config);
+
+    while(config == 0){
+    	switch (ATCOM){
+    	case CMGF:
+            //Para configurar el formato de los mensajes
+            ESP_LOGW(TAG, "Enviara CMGF \r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CMGF=1\r\n", 11);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CMGF);
+            if(strncmp(aux,"\r\nOK",4) == 0){
+            	ATCOM++;
+                ESP_LOGW(TAG,"Aumentando ATCOM");
+                flags_errores = 0;
+            }else if(strncmp(aux,"\r\nERROR",7) == 0){
+            	ESP_LOGE(TAG,"CMGF- Dio Error");
+            	flags_errores++;
+            	if (flags_errores >= 3){
+            		ATCOM = CPOWD;
+            	}
+            }
+            bzero(aux, BUF_SIZE);
+            size = 0;
+    	break;
+    	case CPAS:
+    		// Verificar que se encuentra conectado a la radio base
+    		uart_write_bytes(UART_NUM_1,"AT+CPAS\r\n", 9);
+	        ESP_LOGW(TAG, "Mande CPAS \r\n");
+	        Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CPAS);
+	        if(strncmp(aux,"\r\n+CPAS: 0",10) == 0){
+	        	ESP_LOGE(TAG,"CPAS- Respondio bien");
+	        	config = 1;
+           		flags_errores = 0;
+	        }else if(strncmp(aux,"\r\nERROR",7) == 0){
+	        	ESP_LOGE(TAG,"CPAS- Dio Error");
+	        	flags_errores++;
+	        	if (flags_errores >= 3){
+	        		ATCOM = CPOWD;
+	        	}
+           } else if(strncmp(aux,"\r\n+CPAS: 2",10) == 0 || strncmp(aux,"\r\n+CPAS: 1",10) == 0){
+        	   flags3_errores++;
+	        	if (flags3_errores >= 10){
+	        		ATCOM = CPOWD;
+	        	}
+           }
+           bzero(aux, BUF_SIZE);
+           size = 0;
+        break;
+       	case CPOWD:
+        	//Para apagar el sim800l
+            ESP_LOGW(TAG, "Apagar \r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+            Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CPOWD);
+            if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+               	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	if (flags_errores >= 3){
+            		flags_errores = 0;
+            		Prender_SIM800l();
+	            	vTaskDelay(5000 / portTICK_PERIOD_MS);
+	            	ATCOM = CMGF;
+            	} else{
+               	config = 1;
+               	flags_errores = 0;
+            	}
+            }else {
+            	ESP_LOGE(TAG,"CPOWD- Dio Error");
+            	flags_errores++;
+            	if (flags_errores >= 3){
+            		flags2_errores = 1;
+            		flags_errores = 0;
+            	}
+            }
+            bzero(aux, BUF_SIZE);
+            size = 0;
+        break;
+    	}
+    	ESP_LOGW(TAG,"Final del while");
+    	vTaskDelay(1000 / portTICK_PERIOD_MS);
+    	//verificacion por si dio error en el envio del apagado
+    	//Esto puede ser usado tambien en otros casos para salir del ciclo
+    	if ( flags2_errores == 1){
+    		flags2_errores = 0;
+    		break;
+    	}
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+	ESP_LOGW(TAG,"Sali de la maquina");
+	return(ATCOM);
 }
 
 static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
@@ -255,7 +358,7 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	ESP_LOGW(TAG,"Aumentando ATCOM");
             	flags_errores = 0;
             }else if(strncmp(aux,"\r\nCME ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-            	ESP_LOGE(TAG,"%d- Dio Error",ATCOM);
+            	ESP_LOGE(TAG,"%d- Dio Error",ATCOM+30);
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
@@ -276,7 +379,7 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	flags_errores = 0;
             	vTaskDelay(10000 / portTICK_PERIOD_MS);
             } else if(strncmp(aux,"\r\nERROR",7) == 0 ){
-            	ESP_LOGE(TAG,"2- Dio error");
+            	ESP_LOGE(TAG,"%d- Dio error",ATCOM+30);
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
@@ -296,7 +399,7 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	ESP_LOGW(TAG,"Aumentando ATCOM");
             	flags_errores = 0;
             }else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0 || strncmp(aux,"\r\nERROR",7) == 0 ){
-            	ESP_LOGE(TAG,"3- Dio error");
+            	ESP_LOGE(TAG,"%d- Dio error",ATCOM+30);
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
@@ -315,7 +418,7 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	ESP_LOGW(TAG,"Aumentando ATCOM");
             	flags_errores = 0;
             }else if(strncmp(aux,"\r\nCME ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-            	ESP_LOGE(TAG,"4- Dio Error");
+            	ESP_LOGE(TAG,"%d- Dio Error"-,ATCOM+30);
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
@@ -326,16 +429,16 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
     	break;
     	case CIFSR:
 		       // Para pedir la ip asignada
-		    	uart_write_bytes(UART_NUM_1,"AT+CIFSR\r\n", 10);
-		        ESP_LOGW(TAG, "Pidiendo IP \r\n");
-		        Tiempo_Espera(aux, ATCOM+30,&size,error,t_CIFSR);
-		        char* ip = strstr(aux,".");
-		        if (ip == NULL || strncmp(aux,"\r\nERROR",7) == 0){
-		        	ESP_LOGE(TAG,"6- Dio Error");
-            	flags_errores++;
-            	if (flags_errores >= 3){
+		    uart_write_bytes(UART_NUM_1,"AT+CIFSR\r\n", 10);
+		    ESP_LOGW(TAG, "Pidiendo IP \r\n");
+		    Tiempo_Espera(aux, ATCOM+30,&size,error,t_CIFSR);
+		    char* ip = strstr(aux,".");
+		    if (ip == NULL || strncmp(aux,"\r\nERROR",7) == 0){
+		    ESP_LOGE(TAG,"%d- Dio Error",ATCOM+30);
+            flags_errores++;
+            if (flags_errores >= 3){
             		ATCOM = CPOWD2;
-            	}
+            }
             }else{
             	a = 1;
             	flags_errores = 0;
@@ -349,24 +452,22 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
             Tiempo_Espera(aux, ATCOM+30,&size,error,t_CPOWD);
             if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
-            //	Aqui lo estoy poniendo a regresarse al principio, aunque se queda ahi
-            //	porque apague el modulo
-            	ATCOM = CFUN;
             	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
             	flags_errores = 0;
             }else {
-            	ESP_LOGE(TAG,"%d- Dio Error",ATCOM+1);
+            	ESP_LOGE(TAG,"%d- Dio Error",ATCOM+30);
             	flags_errores++;
             	if (flags_errores >= 3){
             		flags2_errores = 1;
              		flags_errores = 0;
+             		a = 1;
             	}
             }
             bzero(aux, BUF_SIZE);
             size = 0;
     	break;
 	}
-
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 	return ATCOM;
 }
@@ -376,15 +477,27 @@ static void  Envio_GPRS_temp(AM2301_data_t* Thum2){
 
 	char message[318] = "Welcome to ESP32!";
 	char aux[BUF_SIZE] = "";
-	uint16_t size = 0;
+	uint16_t size = 0 , a = 0;
 	e_TEspera T_Espera;
-	uint8_t error = 0;
+	uint8_t error = 0, promedio = 0, posicion = 0;
 	e_ATCOM3 ATCOM3 = 0;
 
+	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    ESP_LOGE("DATOS A ENVIAR", "La posicion es %d",Thum2->pos_temp-1);
+    posicion = Thum2->pos_temp-1;
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    ESP_LOGE("DATOS A ENVIAR", "La posicion es %d",posicion);
+    ESP_LOGE("DATOS A ENVIAR", "El promedio es %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1]);
+    promedio = (int) Thum2->Prom_temp[Thum2->pos_temp-1];
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    ESP_LOGE("DATOS A ENVIAR", "El promedio es %d",promedio);
+
+while (a == 0){
 	switch (ATCOM3){
     case CIPSTART:
     	//Para inciar la comunicacion con thingspeak
-    	ESP_LOGW(TAG, "Thinkspeak 1\r\n");
+    	ESP_LOGW(TAG, "CIPSTART1\r\n");
     	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
     	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
     	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
@@ -428,13 +541,14 @@ static void  Envio_GPRS_temp(AM2301_data_t* Thum2){
             ESP_LOGW(TAG, "CIPSEND\r\n");
             uart_write_bytes(UART_NUM_1,"AT+CIPSEND=75\r\n", 15);
             Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
-            vTaskDelay(300 / portTICK_PERIOD_MS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
             if(strncmp(aux,"\r\n>",3) == 0){
             	//para la temperatura y humedad con lenght de 75
             	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%d\r\n",(int) Thum2->Prom_temp[Thum2->pos_temp-1]);
             	uart_write_bytes(UART_NUM_1,message,75);
                 ESP_LOGW(TAG,"Temperatura enviada");
                 error = 0;
+                ATCOM3++;
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
         		ESP_LOGE(TAG,"%d- Dio Error en el envio de temperatura",ATCOM3+40);
         		error++;
@@ -451,6 +565,7 @@ static void  Envio_GPRS_temp(AM2301_data_t* Thum2){
         	    Tiempo_Espera(aux, 42,&size,error,t_CIPSEND);
         	    if(strncmp(aux,"\r\nCLOSED",8) == 0){
         	        ESP_LOGW(TAG,"Socket cerrado");
+        	        a = 1;
                 }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
                     ESP_LOGE(TAG,"%d- Dio error al enviar la temperatura",ATCOM3+40);
                     error++;
@@ -463,9 +578,12 @@ static void  Envio_GPRS_temp(AM2301_data_t* Thum2){
             break;
         	case CPOWD3:
 
-
+        		a = 1;
         	break;
 	}
+	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    vTaskDelay(700 / portTICK_PERIOD_MS);
+}
 }
 
 static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
@@ -473,15 +591,16 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
 
 	char message[318] = "Welcome to ESP32!";
 	char aux[BUF_SIZE] = "";
-	uint16_t size = 0;
+	uint16_t size = 0, a = 0;
 	e_TEspera T_Espera;
 	uint8_t error = 0;
 	e_ATCOM3 ATCOM3 = 0;
 
+	while (a == 0){
 	switch (ATCOM3){
     case CIPSTART:
     	//Para inciar la comunicacion con thingspeak
-    	ESP_LOGW(TAG, "Thinkspeak 1\r\n");
+    	ESP_LOGW(TAG, "CIPSTART 1\r\n");
     	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
     	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
     	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
@@ -530,8 +649,9 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
             	//para la temperatura y humedad con lenght de 75
             	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field2=%d\r\n",(int) Thum2->Prom_hum[Thum2->pos_temp-1]);
             	uart_write_bytes(UART_NUM_1,message,74);
-                ESP_LOGW(TAG,"Temperatura enviada");
+                ESP_LOGW(TAG,"Humedad enviada");
                 error = 0;
+                ATCOM3++;
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
         		ESP_LOGE(TAG,"%d- Dio Error en el envio de temperatura",ATCOM3+40);
         		error++;
@@ -548,6 +668,7 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
         	    Tiempo_Espera(aux, 42,&size,error,t_CIPSEND);
         	    if(strncmp(aux,"\r\nCLOSED",8) == 0){
         	        ESP_LOGW(TAG,"Socket cerrado");
+        	        a = 1;
                 }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
                     ESP_LOGE(TAG,"%d- Dio error al enviar la temperatura",ATCOM3+40);
                     error++;
@@ -559,37 +680,48 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
                 size = 0;
             break;
         	case CPOWD3:
-
+        		a = 1;
 
         	break;
+	}
+	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_hum[Thum2->pos_temp-1] );
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 }
 
 static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
 
-	// Esta funcion envia datos por GPRS a thingspeak
+	// Esta funcion envia los datos correspondientes por GPRS a thingspeak
 
 	char message[318] = "Welcome to ESP32!";
 	char aux[BUF_SIZE] = "";
-	uint16_t size = 0;
-	e_TEspera T_Espera;
-	uint8_t error = 0;
 
 
+	//El tiempo de espera entre datos de thingspeak es de 15 segundos
 
     if (Thum2->error_temp == 0){
     	switch(limite_b){
     	case 0:
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
     		Envio_GPRS_temp(gps_data2);
     		ESP_LOGI("TAG", "Envio temperatura por GPRS");
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    	    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_hum[Thum2->pos_temp-1] );
     		Envio_GPRS_hum(gps_data2);
     		ESP_LOGI("TAG", "Envio humedad por GPRS");
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
     	break;
     	case 1:
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
     		Envio_GPRS_temp(gps_data2);
     		ESP_LOGI("TAG", "Envio temperatura por GPRS");
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    	    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_hum[Thum2->pos_temp-1] );
     		Envio_GPRS_hum(gps_data2);
-    		ESP_LOGI("TAG", "Envio humedad por GPRS");;
+    		ESP_LOGI("TAG", "Envio humedad por GPRS");
+    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
     		if (limite_a == 0){
 			limite_b = 0;
     		}
@@ -646,6 +778,104 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     }
 }
 
+static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
+{
+	//Esta funcion se encarga de enviar el mensaje de texto adecuado
+	char message[318] = "Welcome to ESP32!";
+	char aux[BUF_SIZE] = "";
+	uint16_t size = 0;
+	e_TEspera T_Espera;
+	uint8_t error = 0;
+
+    if (Thum2->error_temp == 0){
+    	switch(limite_b){
+    	case 0:
+    		sprintf(message,"La humedad es: %.1f %% y la temperatura es: %.1f C",Thum2->Prom_hum[Thum2->pos_temp-1],Thum2->Prom_temp[Thum2->pos_temp-1]);
+    		Envio_mensaje(message,48);
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    	break;
+    	case 1:
+    		sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2->Prom_hum[Thum2->pos_temp-1],Thum2->Prom_temp[Thum2->pos_temp-1]);
+    		Envio_mensaje(message,89);
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    		if (limite_a == 0){
+			limite_b = 0;
+    		}
+    	break;
+    	}
+    } else {
+    	Thum.error_temp = 0;
+    	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
+    	Envio_mensaje(message,57);
+    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    }
+
+    switch (puerta_b){
+    case P_cerrada:
+    // Verifico si no hubo error al conectarse a al modulo GPS
+        if (gps_data2->error_gps == 0){
+        	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
+        	if (gps_data2->year == 20){
+			    sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
+			    Envio_mensaje(message,87);
+			    ESP_LOGI(TAG, "Send send message [%s] ok", message);
+
+        		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2->day,gps_data2->mes,gps_data2->year,gps_data2->hour,gps_data2->minute,gps_data2->second);
+        		Envio_mensaje(message,112);
+        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+        	} else{
+
+        		 sprintf(message,"No se logro conectar a la red GPS.");
+        		 Envio_mensaje(message,34);
+        		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
+        	}
+        } else{
+  			gps_data.error_gps = 0;
+    		sprintf(message,"No se logro conectar con el modulo GPS.");
+    		Envio_mensaje(message,39);
+    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
+        }
+    break;
+    case P_abierta:
+    	// Verifico si no hubo error al conectarse a al modulo GPS
+    	if (gps_data2->error_gps == 0){
+    	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
+    		if (gps_data2->year == 20){
+
+    			 sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
+    			 Envio_mensaje(message,87);
+    			 ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    			if (puerta_a == 0){
+    				puerta_b = 0;
+    				puerta_c = 0;
+    			}
+
+    	         sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2->day,gps_data2->mes,gps_data2->year,gps_data2->hour,gps_data2->minute,gps_data2->second);
+    	         Envio_mensaje(message,112);
+    	         ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    	    } else{
+
+    	    	 sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
+    	    	 Envio_mensaje(message,59);
+    	    	 ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    			if (puerta_a == 0){
+    				puerta_b = 0;
+    				puerta_c = 0;
+    			}
+    	    }
+    	} else{
+			gps_data.error_gps = 0;
+			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
+			Envio_mensaje(message,64);
+			ESP_LOGI(TAG, "Send send message [%s] ok", message);
+			if (puerta_a == 0){
+				puerta_b = 0;
+				puerta_c = 0;
+			}
+    	}
+    break;
+    }
+}
 
 //Escribir en la memoria flash
 void set_form_flash_init( message_data_t *datos){
@@ -678,16 +908,15 @@ void Mandar_mensaje(void *P)
 	char message[318] = "Welcome to ESP32!";
 	char aux[BUF_SIZE] = "";
 	uint16_t size = 0;
-	e_ATCOM ATCOM = 0;
-	e_ATCOM2 ATCOM2 = 0;
+	e_ATCOM ATCOM = CMGF;
+	e_ATCOM2 ATCOM2 = CFUN;
 	e_TEspera T_Espera;
 	gps_data_t gps_data2;
 	AM2301_data_t Thum2;
 	message_data_t message_data;
-	uint8_t flags_errores = 0;
-	uint8_t flags2_errores = 0;
-	uint8_t flags3_errores = 0;
-	uint8_t config_sim800 = 0;
+	uint8_t flags_errores = 0,flags2_errores = 0, flags3_errores = 0;
+	uint8_t config_sim800 = 0, prender_apagar = 0;
+
 
 
 
@@ -699,12 +928,14 @@ void Mandar_mensaje(void *P)
 	    xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
 
 	    ESP_LOGW(TAG, "Apagare y prendere\r\n");
-	    /* Apagar el modulo por si esta prendido al entrar en la tarea */
-	    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
-	    vTaskDelay(2000 / portTICK_PERIOD_MS);
-	    Prender_SIM800l();
 
-	    ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
+	    /* Apagar el modulo por si esta prendido al entrar en la tarea */
+    	if  (prender_apagar == 0){
+    	    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+    	    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    	    Prender_SIM800l();
+    	}
+
 	    //Recibo la informacion de la temperatura
 	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 4000 / portTICK_PERIOD_MS)) {
 	    	sprintf(message_data.Humedad, "%f",Thum2.Prom_hum[Thum2.pos_temp-1]);
@@ -729,197 +960,29 @@ void Mandar_mensaje(void *P)
     	if (limite_b == 1 || puerta_b == 1){
         		set_form_flash_init(&message_data);
         	}
-    	ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
-    /* Para mandar mensajes con menuconfig se puede configurar el numero que recibira el mensaje
-     y el mensaje va a ser el la variable message, recordando que tiene un limite de caracteres
-     * */
-    while(config_sim800 == 0){
-    	switch (ATCOM){
-    	case CMGF:
-            //Para configurar el formato de los mensajes
-            uart_write_bytes(UART_NUM_1,"AT+CMGF=1\r\n", 11);
-            vTaskDelay(500 / portTICK_PERIOD_MS);
-            ESP_LOGW(TAG, "Cmgf activo \r\n");
-            Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CMGF);
-            if(strncmp(aux,"\r\nOK",4) == 0){
-            	ATCOM++;
-                ESP_LOGW(TAG,"Aumentando ATCOM");
-                flags_errores = 0;
-            }else if(strncmp(aux,"\r\nERROR",7) == 0){
-            	ESP_LOGE(TAG,"CMGF- Dio Error");
-            	flags_errores++;
-            	if (flags_errores >= 3){
-            		ATCOM = CPOWD;
-            	}
-            }
-            bzero(aux, BUF_SIZE);
-            size = 0;
-    	break;
-    	case CPAS:
-    		// Verificar que se encuentra conectado a la radio base
-    		uart_write_bytes(UART_NUM_1,"AT+CPAS\r\n", 9);
-	        ESP_LOGW(TAG, "Mande CPAS \r\n");
-	        Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CPAS);
-	        if(strncmp(aux,"\r\n+CPAS: 0",10) == 0){
-	        	ESP_LOGE(TAG,"CPAS- Respondio bien");
-	        	config_sim800 = 1;
-           		flags_errores = 0;
-	        }else if(strncmp(aux,"\r\nERROR",7) == 0){
-	        	ESP_LOGE(TAG,"CPAS- Dio Error");
-	        	flags_errores++;
-	        	if (flags_errores >= 3){
-	        		ATCOM = CPOWD;
-	        	}
-           } else if(strncmp(aux,"\r\n+CPAS: 2",10) == 0 || strncmp(aux,"\r\n+CPAS: 1",10) == 0){
-        	   flags3_errores++;
-	        	if (flags3_errores >= 10){
-	        		ATCOM = CPOWD;
-	        	}
-           }
-           bzero(aux, BUF_SIZE);
-           size = 0;
-        break;
-       	case CPOWD:
-        	//Para apagar el sim800l
-            ESP_LOGW(TAG, "Apagar \r\n");
-            uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
-            Tiempo_Espera(aux, ATCOM,&size,&flags_errores,t_CPOWD);
-            if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
-               	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
-            	if (flags_errores >= 3){
-            		flags_errores = 0;
-            		Prender_SIM800l();
-	            	vTaskDelay(5000 / portTICK_PERIOD_MS);
-	            	ATCOM = CMGF;
-            	} else{
-               	config_sim800 = 1;
-               	flags_errores = 0;
-            	}
-            }else {
-            	ESP_LOGE(TAG,"CPOWD- Dio Error");
-            	flags_errores++;
-            	if (flags_errores >= 3){
-            		flags2_errores = 1;
-            		flags_errores = 0;
-            	}
-            }
-            bzero(aux, BUF_SIZE);
-            size = 0;
-        break;
-    	}
-    	ESP_LOGW(TAG,"Final del while");
-    	vTaskDelay(1000 / portTICK_PERIOD_MS);
-    	//verificacion por si dio error en el envio del apagado
-    	//Esto puede ser usado tambien en otros casos para salir del ciclo
-    	if ( flags2_errores == 1){
-    		flags2_errores = 0;
-    		break;
-    	}
-    }
-	ESP_LOGW(TAG,"Sali de la maquina");
-    	config_sim800 = 0;
+
+    ESP_LOGE("DATOS A ENVIAR", "GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%d\r\n",(int) Thum2.Prom_temp[Thum2.pos_temp-1]);
+    ESP_LOGE("DATOS A ENVIAR", "GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%d\r\n",(int) Thum2.Prom_temp[Thum2.pos_temp-2]);
+	ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
+   	ATCOM = Configurar_GSM(ATCOM,&config_sim800);
+
 
 
     //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
     if (ATCOM != CPOWD){
-    if (Thum2.error_temp == 0){
-    	switch(limite_b){
-    	case 0:
-    		sprintf(message,"La humedad es: %.1f %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-    		Enviar_mensaje(message,48);
-    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-    	break;
-    	case 1:
-    		sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2.Prom_hum[Thum2.pos_temp-1],Thum2.Prom_temp[Thum2.pos_temp-1]);
-    		Enviar_mensaje(message,89);
-    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-    		if (limite_a == 0){
-			limite_b = 0;
-    		}
-    	break;
-    	}
-    } else {
-    	Thum.error_temp = 0;
-    	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
-    	Enviar_mensaje(message,57);
-
-    	ESP_LOGI(TAG, "Send send message [%s] ok", message);
+    	Enviar_Mensaje(&gps_data2,&Thum2);
+    	ATCOM2 = Configurar_GPRS(ATCOM2);
     }
 
-    switch (puerta_b){
-    case P_cerrada:
-    // Verifico si no hubo error al conectarse a al modulo GPS
-        if (gps_data2.error_gps == 0){
-        	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-        	if (gps_data2.year == 20){
-			    sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
-		    	Enviar_mensaje(message,87);
-			    ESP_LOGI(TAG, "Send send message [%s] ok", message);
 
-        		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
-        		Enviar_mensaje(message,112);
-        		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-        	} else{
 
-        		 sprintf(message,"No se logro conectar a la red GPS.");
-        		 Enviar_mensaje(message,34);
-        		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
-        	}
-        } else{
-  			gps_data.error_gps = 0;
-    		sprintf(message,"No se logro conectar con el modulo GPS.");
-    		Enviar_mensaje(message,39);
-    		ESP_LOGI(TAG, "Send send message [%s] ok", message);
-        }
-    break;
-    case P_abierta:
-    	// Verifico si no hubo error al conectarse a al modulo GPS
-    	if (gps_data2.error_gps == 0){
-    	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
-    		if (gps_data2.year == 20){
-
-    			 sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2.latitude_prom,gps_data2.latitude_direct,gps_data2.longitude_prom,gps_data2.longitude_direct);
-    			 Enviar_mensaje(message,87);
-    			 ESP_LOGI(TAG, "Send send message [%s] ok", message);
-    			if (puerta_a == 0){
-    				puerta_b = 0;
-    				puerta_c = 0;
-    			}
-
-    	         sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2.day,gps_data2.mes,gps_data2.year,gps_data2.hour,gps_data2.minute,gps_data2.second);
-    	         Enviar_mensaje(message,112);
-    	         ESP_LOGI(TAG, "Send send message [%s] ok", message);
-    	    } else{
-
-    	    	 sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
-    	    	 Enviar_mensaje(message,59);
-    	    	 ESP_LOGI(TAG, "Send send message [%s] ok", message);
-    			if (puerta_a == 0){
-    				puerta_b = 0;
-    				puerta_c = 0;
-    			}
-    	    }
-    	} else{
-			gps_data.error_gps = 0;
-			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
-			Enviar_mensaje(message,64);
-			ESP_LOGI(TAG, "Send send message [%s] ok", message);
-			if (puerta_a == 0){
-				puerta_b = 0;
-				puerta_c = 0;
-			}
-    	}
-    break;
-    }
-    }
-
-    ATCOM2 = Configurar_GPRS(ATCOM2);
-
-    if (ATCOM2 != CPOWD2){
+    if (ATCOM2 != CPOWD2 && ATCOM2 != CFUN ){
     	Enviar_GPRS(&gps_data2,&Thum2);
     }
     /* Power down module */
 	ATCOM = CMGF;
+	ATCOM2 = CFUN;
+    config_sim800 = 0;
     ESP_LOGI(TAG, "Power down");
     uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
     vTaskDelay(2000 / portTICK_PERIOD_MS);

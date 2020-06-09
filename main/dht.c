@@ -344,6 +344,7 @@ void TareaDHT(void *P){
             if (Thum.vuelta_error >= 10){
             	Thum.vuelta_error = 0;
             	Thum.error_temp = 1;
+            	xQueueOverwrite(xQueue_temp,&Thum);
             	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
             	break;
             }

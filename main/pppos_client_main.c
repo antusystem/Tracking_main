@@ -1,10 +1,5 @@
-/* PPPoS Client Example
+/*
 
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
 */
 #include "dht.h"
 #include <stdio.h>
@@ -14,35 +9,23 @@
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
-#include "esp_netif.h"
-#include "esp_netif_ppp.h"
-#include "mqtt_client.h"
-#include "esp_modem.h"
-#include "esp_modem_netif.h"
 #include "esp_log.h"
 #include "sim800.h"
 #include "bg96.h"
 #include "nvs_flash.h"
 #include "tracking.h"
-#include "esp_sleep.h"
-#include "driver/rtc_io.h"
+//#include "esp_sleep.h"
+//#include "driver/rtc_io.h"
 
 
 
-/* prender el SIM800L*/
-#include "driver/gpio.h"
+/* Configuracion de pines del SIM800L*/
 
 #define SIM800l_PWR_KEY (4)
 #define SIM800l_PWR (23)
 #define SIM800l_RST (5)
 
-// Cosas de la temperatura
-
-//#define Pila 1024
-
-
 //Para el gps
-
 #define BUF_SIZE (1024)
 #include "NMEA_setting.h"
 
@@ -57,16 +40,16 @@ uint8_t limite_a =0;
 uint8_t limite_b =0;
 uint8_t limite_c = 0;
 
+//Varaible para saber si dio error PDP_deact
+
+uint8_t pdp_deact = 0;
+
 
 #define MEN_TXD  (GPIO_NUM_27)
 #define MEN_RXD  (GPIO_NUM_26)
 #define MEN_RTS  (UART_PIN_NO_CHANGE)
 #define MEN_CTS  (UART_PIN_NO_CHANGE)
 
-
-
-//#define BROKER_URL "mqtt://kike:Kike3355453@mqtt.tiosplatform.com"
-#define BROKER_URL "201.211.92.114:5500"
 
 static const char *TAG = "pppos_example";
 EventGroupHandle_t event_group = NULL;
@@ -170,7 +153,6 @@ static void  Tiempo_Espera(char* aux, uint8_t estado, uint16_t* tamano, uint8_t*
 }
 
 
-
 static void  Prender_SIM800l()
 {
 	// Esta funcion prende el modulo sim800 y le da un tiempo para que se conecte a la radiobase
@@ -230,18 +212,16 @@ static void  Envio_mensaje(char* mensaje, uint8_t tamano)
 	vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
-static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM, uint8_t* config)
+static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM)
 {
 	//Esta funcion de configurar el sim800 para enviar mensajes de texto
 	ATCOM = CMGF;
 	char aux[BUF_SIZE] = "!";
 	uint16_t size = 0;
-	uint8_t error = 0;
+	uint8_t error = 0, config = 0;
 	uint8_t flags_errores = 0, flags2_errores = 0, flags3_errores = 0;
 	//Cuando leia config  daba un valor incorrecto, asi que lo paso de nuevo aca, creo
 	//que se puede borrar config de afuera de esta funcion
-	config = 0;
-	ESP_LOGE(TAG, "config es %d \r\n",(int) config);
 
     while(config == 0){
     	switch (ATCOM){
@@ -261,6 +241,10 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM, uint8_t* config)
             	if (flags_errores >= 3){
             		ATCOM = CPOWD;
             	}
+            } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CMGF- PDP DEACT");
+            	flags_errores++;
+            	ATCOM = CPOWD;
             }
             bzero(aux, BUF_SIZE);
             size = 0;
@@ -311,6 +295,7 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM, uint8_t* config)
             	if (flags_errores >= 3){
             		flags2_errores = 1;
             		flags_errores = 0;
+            		config = 1;
             	}
             }
             bzero(aux, BUF_SIZE);
@@ -319,13 +304,6 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM, uint8_t* config)
     	}
     	ESP_LOGW(TAG,"Final del while");
     	vTaskDelay(1000 / portTICK_PERIOD_MS);
-    	//verificacion por si dio error en el envio del apagado
-    	//Esto puede ser usado tambien en otros casos para salir del ciclo
-    	if ( flags2_errores == 1){
-    		flags2_errores = 0;
-    		break;
-    	}
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 	ESP_LOGW(TAG,"Sali de la maquina");
 	return(ATCOM);
@@ -478,20 +456,15 @@ static void  Envio_GPRS_temp(AM2301_data_t* Thum2){
 	char message[318] = "Welcome to ESP32!";
 	char aux[BUF_SIZE] = "";
 	uint16_t size = 0 , a = 0;
-	e_TEspera T_Espera;
-	uint8_t error = 0, promedio = 0, posicion = 0;
+//	e_TEspera T_Espera;
+	uint8_t error = 0;
 	e_ATCOM3 ATCOM3 = 0;
 
 	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
     ESP_LOGE("DATOS A ENVIAR", "La posicion es %d",Thum2->pos_temp-1);
-    posicion = Thum2->pos_temp-1;
+ //   ESP_LOGE("DATOS A ENVIAR", "El promedio es %d",(int)promedio);
     vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP_LOGE("DATOS A ENVIAR", "La posicion es %d",posicion);
-    ESP_LOGE("DATOS A ENVIAR", "El promedio es %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1]);
-    promedio = (int) Thum2->Prom_temp[Thum2->pos_temp-1];
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP_LOGE("DATOS A ENVIAR", "El promedio es %d",promedio);
+
 
 while (a == 0){
 	switch (ATCOM3){
@@ -581,8 +554,7 @@ while (a == 0){
         		a = 1;
         	break;
 	}
-	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
-    vTaskDelay(700 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 }
 
@@ -702,26 +674,18 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     if (Thum2->error_temp == 0){
     	switch(limite_b){
     	case 0:
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
-    		Envio_GPRS_temp(gps_data2);
-    		ESP_LOGI("TAG", "Envio temperatura por GPRS");
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    		Envio_GPRS_temp(Thum2);
+    		ESP_LOGW("TAG", "Envio temperatura por GPRS");
     	    vTaskDelay(10000 / portTICK_PERIOD_MS);
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_hum[Thum2->pos_temp-1] );
-    		Envio_GPRS_hum(gps_data2);
-    		ESP_LOGI("TAG", "Envio humedad por GPRS");
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    		Envio_GPRS_hum(Thum2);
+    		ESP_LOGW("TAG", "Envio humedad por GPRS");
     	break;
     	case 1:
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
-    		Envio_GPRS_temp(gps_data2);
-    		ESP_LOGI("TAG", "Envio temperatura por GPRS");
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    		Envio_GPRS_temp(Thum2);
+    		ESP_LOGW("TAG", "Envio temperatura por GPRS");
     	    vTaskDelay(10000 / portTICK_PERIOD_MS);
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_hum[Thum2->pos_temp-1] );
-    		Envio_GPRS_hum(gps_data2);
-    		ESP_LOGI("TAG", "Envio humedad por GPRS");
-    		ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
+    		Envio_GPRS_hum(Thum2);
+    		ESP_LOGW("TAG", "Envio humedad por GPRS");
     		if (limite_a == 0){
 			limite_b = 0;
     		}
@@ -910,14 +874,11 @@ void Mandar_mensaje(void *P)
 	uint16_t size = 0;
 	e_ATCOM ATCOM = CMGF;
 	e_ATCOM2 ATCOM2 = CFUN;
-	e_TEspera T_Espera;
+//	e_TEspera T_Espera;
 	gps_data_t gps_data2;
 	AM2301_data_t Thum2;
 	message_data_t message_data;
-	uint8_t flags_errores = 0,flags2_errores = 0, flags3_errores = 0;
-	uint8_t config_sim800 = 0, prender_apagar = 0;
-
-
+	uint8_t prender_apagar = 0;
 
 
 	printf("Entre en mandar mensaje \r\n");
@@ -958,31 +919,40 @@ void Mandar_mensaje(void *P)
     	//Verifico si se supero el limite de temperatura o se abrio la puerta para guardar la informacion
     	//en la memoria flash
     	if (limite_b == 1 || puerta_b == 1){
-        		set_form_flash_init(&message_data);
+    		ESP_LOGW(TAG, "Guardare en la memoria flash\r\n");
+        	set_form_flash_init(&message_data);
         	}
 
-    ESP_LOGE("DATOS A ENVIAR", "GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%d\r\n",(int) Thum2.Prom_temp[Thum2.pos_temp-1]);
-    ESP_LOGE("DATOS A ENVIAR", "GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%d\r\n",(int) Thum2.Prom_temp[Thum2.pos_temp-2]);
-	ESP_LOGW(TAG, "Empezara la maquina de estados\r\n");
-   	ATCOM = Configurar_GSM(ATCOM,&config_sim800);
+	ESP_LOGW(TAG, "Verificara el estado de la red para poder enviar mensajes\r\n");
+
+	ATCOM = Configurar_GSM(ATCOM);
 
 
-
-    //Se verifica si se logro medir la temperatura y se manda el mensaje correspondiente
+    //Si la red esta conectada entonces entonces se envia lo mensajes y luego se configura el GPRS
     if (ATCOM != CPOWD){
     	Enviar_Mensaje(&gps_data2,&Thum2);
-    	ATCOM2 = Configurar_GPRS(ATCOM2);
+    	//Si es la primera vuelta configuro el GPRS
+    	if  (prender_apagar == 0){
+        	ATCOM2 = Configurar_GPRS(ATCOM2);
+        	prender_apagar = 1;
+    	}
     }
 
 
-
+    //Si se logro configurar correctamente y activar el GPRS se enviando los datos
     if (ATCOM2 != CPOWD2 && ATCOM2 != CFUN ){
     	Enviar_GPRS(&gps_data2,&Thum2);
     }
-    /* Power down module */
+
+    //Se reinician las variables para el siguiente ciclo
+
+	if (ATCOM == CPOWD || ATCOM2 == CPOWD2){
+		//prender_apagar = 0;
+	}
+
+ //   config_sim800 = 0;
 	ATCOM = CMGF;
 	ATCOM2 = CFUN;
-    config_sim800 = 0;
     ESP_LOGI(TAG, "Power down");
     uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
     vTaskDelay(2000 / portTICK_PERIOD_MS);

@@ -41,123 +41,12 @@ const char *nvs_tag = "NVS";
 
 const float Temp_up = 29;
 const float Temp_down = 26;
-/*
-//Escribir en la memoria flash
-void set_form_flash_init( AM2301_data_t Thum){
-	esp_err_t err;
-	nvs_handle_t ctrl_flash;
-	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);
-	if (err != ESP_OK) {
-		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-	}else{
-		nvs_set_str(ctrl_flash,"Humedad1",Thum.Humedad1);
-		nvs_set_str(ctrl_flash,"Temperatura1",Thum.Temperatura1);
-		ESP_LOGI("NVS_FLASH","Temperatura2 a guardar en flash: %d",Thum.Temperatura2);
-		nvs_set_u16(ctrl_flash,"Temp2",Thum.Temperatura2);
-		nvs_set_u16(ctrl_flash,"Humedad2",Thum.Humedad2);
-		ESP_LOGI("NVS_FLASH","Datos_Sensor a guardar en flash: %s",Thum.Datos_Sensor);
-		nvs_set_str(ctrl_flash,"Datos_Sensor",Thum.Datos_Sensor);
-		err = nvs_commit(ctrl_flash);
-	}
-	nvs_close(ctrl_flash);
-}*/
-/*
-//Leer la memoria flash
-void get_form_flash( AM2301_data_t *Thum){
-	size_t len;
-	esp_err_t err;
-	nvs_handle_t ctrl_flash;
-	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);
-	if (err != ESP_OK) {
-		printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-	}else{
-		err = nvs_get_str(ctrl_flash,"Humedad1",NULL,&len);
-		if(err==ESP_OK) {
-			err = nvs_get_str(ctrl_flash,"Humedad1",Thum->Humedad1,&len);
-			switch(err){
-				case ESP_OK:
-					ESP_LOGI(nvs_tag,"Humedad1 en flash: %s",Thum->Humedad1);
-				break;
-				case ESP_ERR_NVS_NOT_FOUND:
-					ESP_LOGI(nvs_tag,"Humedad1 en flash: none");
-				break;
-				default:
-					printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-				break;
-			}
-		}
-		err = nvs_get_str(ctrl_flash,"Temperatura1",NULL,&len);
-		if(err==ESP_OK){
-			err= nvs_get_str(ctrl_flash,"Temperatura1",Thum->Temperatura1,&len);
-		switch(err){
-			case ESP_OK:
-				ESP_LOGI(nvs_tag,"Temperatura1 en flash: %s",Thum->Temperatura1);
-			break;
-			case ESP_ERR_NVS_NOT_FOUND:
-				ESP_LOGI(nvs_tag,"Temperatura1 en flash: none");
-			break;
-			default:
-				printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-			break;
-		}
-		err = nvs_get_u16(ctrl_flash,"Humedad2",&(Thum->Humedad2));
-							switch(err){
-								case ESP_OK:
-									ESP_LOGI(nvs_tag,"Humedad2 en flash: %d",Thum->Humedad2);
-								break;
-								case ESP_ERR_NVS_NOT_FOUND:
-									ESP_LOGI(nvs_tag,"Humedad2 en flash: none");
-								break;
-								default:
-									printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-								break;
-							}
-		}
-	}nvs_close(ctrl_flash);
-	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);
-		if (err != ESP_OK) {
-			printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-		}else{
-			err = nvs_get_u16(ctrl_flash,"Temp2",&(Thum->Temperatura2));
-								switch(err){
-									case ESP_OK:
-										ESP_LOGI(nvs_tag,"Temperatura2 en flash: %d",Thum->Temperatura2);
-									break;
-									case ESP_ERR_NVS_NOT_FOUND:
-										ESP_LOGI(nvs_tag,"Temperatura2 en flash: none");
-									break;
-									default:
-										printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-									break;
-								}
-			err = nvs_get_str(ctrl_flash,"Datos_Sensor",NULL,&len);
-			if(err==ESP_OK) {
-				err = nvs_get_str(ctrl_flash,"Datos_Sensor",Thum->Datos_Sensor,&len);
-				switch(err){
-					case ESP_OK:
-						ESP_LOGI(nvs_tag,"Datos_Sensor en flash: %s",Thum->Datos_Sensor);
-					break;
-					case ESP_ERR_NVS_NOT_FOUND:
-						ESP_LOGI(nvs_tag,"Datos_Sensor en flash: none");
-					break;
-					default:
-						printf("Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-					break;
-				}
-			}
-	}
-	nvs_close(ctrl_flash);
-}
-*/
-
 
 
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-// Funcion para medir tiempo en us ----------------------------------
-static esp_err_t TiempoDeEspera(gpio_num_t pin,
-		                        uint32_t timeout,
-								int valor_esperado,
-								uint32_t *contador_us){
+
+static esp_err_t TiempoDeEspera(gpio_num_t pin, uint32_t timeout, int valor_esperado, uint32_t *contador_us){
+	// Funcion para medir tiempo en us
     gpio_set_direction(pin, GPIO_MODE_INPUT);
     for (uint32_t i = 0; i < timeout; i += us_retardo){
         ets_delay_us(us_retardo);
@@ -168,8 +57,9 @@ static esp_err_t TiempoDeEspera(gpio_num_t pin,
     }
     return ESP_ERR_TIMEOUT;
 }
-// Funcion para capturar bits del DHT11 -----------------------------
+
 static esp_err_t CapturarDatos(gpio_num_t pin, uint8_t datos[numDHT_bytes]){
+	// Funcion para capturar bits del DHT11
     uint32_t tiempo_low;
     uint32_t tiempo_high;
     // Inicio de la secuencia de lectura
@@ -330,8 +220,8 @@ void TareaDHT(void *P){
             Thum.Prom_temp[Thum.pos_temp] = prom_temp/16;
             prom_hum =  0.0;
             prom_temp = 0.0;
-        	ESP_LOGI("PRUEBA","La humedad promedio es %.1f",Thum.Prom_hum[Thum.pos_temp]);
-        	ESP_LOGI("PRUEBA","La temperatura promedio es %.1f",Thum.Prom_temp[Thum.pos_temp]);
+      //  	ESP_LOGI("Sensor_AM2301","La humedad promedio es %.1f",Thum.Prom_hum[Thum.pos_temp]);
+      //  	ESP_LOGI("Sensor_AM2301","La temperatura promedio es %.1f",Thum.Prom_temp[Thum.pos_temp]);
         	Thum.pos_temp++;
         	xQueueOverwrite(xQueue_temp,&Thum);
         }

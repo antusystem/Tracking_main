@@ -444,7 +444,7 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             		ATCOM = CPOWD2;
             }
             } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
-            	ESP_LOGE(TAG,"CIFSR- PDP DEACT");
+            	ESP_LOGE(TAG,"COPWD2- PDP DEACT");
             	flags_errores++;
             	pdp_deact = 1;
             	ATCOM = CPOWD2;

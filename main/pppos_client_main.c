@@ -238,12 +238,13 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM)
             }else if(strncmp(aux,"\r\nERROR",7) == 0){
             	ESP_LOGE(TAG,"CMGF- Dio Error");
             	flags_errores++;
-            	if (flags_errores >= 3){
+            	if (flags_errores >= 5){
             		ATCOM = CPOWD;
             	}
             } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
             	ESP_LOGE(TAG,"CMGF- PDP DEACT");
             	flags_errores++;
+            	pdp_deact = 1;
             	ATCOM = CPOWD;
             }
             bzero(aux, BUF_SIZE);
@@ -269,7 +270,13 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM)
 	        	if (flags3_errores >= 10){
 	        		ATCOM = CPOWD;
 	        	}
+           } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+           	ESP_LOGE(TAG,"CPAS- PDP DEACT");
+           	flags_errores++;
+           	pdp_deact = 1;
+           	ATCOM = CPOWD;
            }
+
            bzero(aux, BUF_SIZE);
            size = 0;
         break;
@@ -282,9 +289,7 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM)
                	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
             	if (flags_errores >= 3){
             		flags_errores = 0;
-            		Prender_SIM800l();
-	            	vTaskDelay(5000 / portTICK_PERIOD_MS);
-	            	ATCOM = CMGF;
+	            	config = 1;
             	} else{
                	config = 1;
                	flags_errores = 0;
@@ -305,7 +310,7 @@ static e_ATCOM  Configurar_GSM(e_ATCOM ATCOM)
     	ESP_LOGW(TAG,"Final del while");
     	vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-	ESP_LOGW(TAG,"Sali de la maquina");
+	ESP_LOGW(TAG,"Termine de configurar para GSM");
 	return(ATCOM);
 }
 
@@ -336,11 +341,16 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	ESP_LOGW(TAG,"Aumentando ATCOM");
             	flags_errores = 0;
             }else if(strncmp(aux,"\r\nCME ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-            	ESP_LOGE(TAG,"%d- Dio Error",ATCOM+30);
+            	ESP_LOGE(TAG,"CFUN- Dio Error");
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
             	}
+            } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CFUN- PDP DEACT");
+            	flags_errores++;
+            	pdp_deact = 1;
+            	ATCOM = CPOWD2;
             }
             bzero(aux, BUF_SIZE);
             size = 0;
@@ -357,11 +367,16 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	flags_errores = 0;
             	vTaskDelay(10000 / portTICK_PERIOD_MS);
             } else if(strncmp(aux,"\r\nERROR",7) == 0 ){
-            	ESP_LOGE(TAG,"%d- Dio error",ATCOM+30);
+            	ESP_LOGE(TAG,"CSTT- Dio error");
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
             	}
+            } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CMGF- PDP DEACT");
+            	flags_errores++;
+            	pdp_deact = 1;
+            	ATCOM = CPOWD2;
             }
             bzero(aux, BUF_SIZE);
             size = 0;
@@ -376,12 +391,17 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	ATCOM++;
             	ESP_LOGW(TAG,"Aumentando ATCOM");
             	flags_errores = 0;
-            }else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0 || strncmp(aux,"\r\nERROR",7) == 0 ){
-            	ESP_LOGE(TAG,"%d- Dio error",ATCOM+30);
+            }else if(strncmp(aux,"\r\nERROR",7) == 0 ){
+            	ESP_LOGE(TAG,"CIICR- Dio error");
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
             	}
+            }else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIICR- PDP DEACT");
+            	flags_errores++;
+            	pdp_deact = 1;
+            	ATCOM = CPOWD2;
             }
             bzero(aux, BUF_SIZE);
             size = 0;
@@ -396,11 +416,16 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             	ESP_LOGW(TAG,"Aumentando ATCOM");
             	flags_errores = 0;
             }else if(strncmp(aux,"\r\nCME ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-            	ESP_LOGE(TAG,"%d- Dio Error"-,ATCOM+30);
+            	ESP_LOGE(TAG,"CGREG- Dio Error");
             	flags_errores++;
             	if (flags_errores >= 3){
             		ATCOM = CPOWD2;
             	}
+            } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CGREG- PDP DEACT");
+            	flags_errores++;
+            	pdp_deact = 1;
+            	ATCOM = CPOWD2;
             }
             bzero(aux, BUF_SIZE);
             size = 0;
@@ -410,14 +435,20 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
 		    uart_write_bytes(UART_NUM_1,"AT+CIFSR\r\n", 10);
 		    ESP_LOGW(TAG, "Pidiendo IP \r\n");
 		    Tiempo_Espera(aux, ATCOM+30,&size,error,t_CIFSR);
+		    //BUsco si lo que llego al uart tiene un . para ver si respondio la ip
 		    char* ip = strstr(aux,".");
 		    if (ip == NULL || strncmp(aux,"\r\nERROR",7) == 0){
-		    ESP_LOGE(TAG,"%d- Dio Error",ATCOM+30);
+		    ESP_LOGE(TAG,"CIFSR- Dio Error");
             flags_errores++;
             if (flags_errores >= 3){
             		ATCOM = CPOWD2;
             }
-            }else{
+            } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIFSR- PDP DEACT");
+            	flags_errores++;
+            	pdp_deact = 1;
+            	ATCOM = CPOWD2;
+            } else {
             	a = 1;
             	flags_errores = 0;
             }
@@ -432,11 +463,17 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
             	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
             	flags_errores = 0;
-            }else {
-            	ESP_LOGE(TAG,"%d- Dio Error",ATCOM+30);
+            }  else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CPOWD2- PDP DEACT");
             	flags_errores++;
             	if (flags_errores >= 3){
-            		flags2_errores = 1;
+             		flags_errores = 0;
+             		a = 1;
+            	}
+            } else {
+            	ESP_LOGE(TAG,"CPOWD2- Dio Error");
+            	flags_errores++;
+            	if (flags_errores >= 3){
              		flags_errores = 0;
              		a = 1;
             	}
@@ -480,11 +517,16 @@ while (a == 0){
                 ESP_LOGW(TAG,"Aumentando ATCOM");
                 error = 0;
         }else if(strncmp(aux,"\r\nERROR",7) == 0){
-        	ESP_LOGE(TAG,"%d- Dio Error",ATCOM3+40);
+        	ESP_LOGE(TAG,"CIPSTART- TEMP Dio Error");
             error++;
-        if (error >= 3){
+            if (error >= 3){
+            	ATCOM3 = CPOWD3;
+            }
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- TEMP PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
         	ATCOM3 = CPOWD3;
-        }
         }
         bzero(aux, BUF_SIZE);
         size = 0;
@@ -500,12 +542,17 @@ while (a == 0){
         		error = 0;
         		vTaskDelay(2000 / portTICK_PERIOD_MS);
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-        		ESP_LOGE(TAG,"%d- Dio Error",ATCOM3+40);
+        		ESP_LOGE(TAG,"CIPSTART2- TEMP Dio Error");
         		error++;
         		if (error >= 3){
         			ATCOM3 = CPOWD3;
         		}
-        	}
+        	}else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSTART2- TEMP PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            }
         bzero(aux, BUF_SIZE);
         size = 0;
         break;
@@ -523,12 +570,17 @@ while (a == 0){
                 error = 0;
                 ATCOM3++;
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-        		ESP_LOGE(TAG,"%d- Dio Error en el envio de temperatura",ATCOM3+40);
+        		ESP_LOGE(TAG,"CIPSEND- TEMP Dio Error");
         		error++;
         		if (error >= 3){
         			ATCOM3 = CPOWD3;
         		}
-        	}
+        	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSEND- TEMP PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            }
         	bzero(aux, BUF_SIZE);
         	size = 0;
         	break;
@@ -540,17 +592,41 @@ while (a == 0){
         	        ESP_LOGW(TAG,"Socket cerrado");
         	        a = 1;
                 }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-                    ESP_LOGE(TAG,"%d- Dio error al enviar la temperatura",ATCOM3+40);
+                    ESP_LOGE(TAG,"CIPSEND2- TEMP Dio error");
                     error++;
                     if (error >= 3){
                     	ATCOM3 = CPOWD3;
                     }
+                } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+                	ESP_LOGE(TAG,"CIPSEND2- TEMP PDP DEACT");
+                	error++;
+                	pdp_deact = 1;
+                	ATCOM3 = CPOWD3;
                 }
                 bzero(aux, BUF_SIZE);
                 size = 0;
             break;
         	case CPOWD3:
+        		//Para apagar el sim800l
+ /*               ESP_LOGW(TAG, "Apagar \r\n");
+                uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+                Tiempo_Espera(aux, ATCOM+30,&size,error,t_CPOWD);
+                if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+                	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+                	flags_errores = 0;
+                } else {
+                	ESP_LOGE(TAG,"CPOWD2- Dio Error");
+                	flags_errores++;
+                	if (flags_errores >= 3){
+                 		flags_errores = 0;
+                 		a = 1;
+                	}
+                }
+                bzero(aux, BUF_SIZE);
+                size = 0;*/
 
+        		//Si apaga enviando la temperatura, al enviar la humedad esperara mucho por respuesta
+        		//Si lo apago en la humendad no ocurrira este inconveniente
         		a = 1;
         	break;
 	}
@@ -576,17 +652,22 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
     	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
     	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
     	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
-    			strncmp(aux,"\r\nALREADY CONNECTED",7) == 0 ||
-    			strncmp(aux,"\r\nOK",4) == 0){
-                ATCOM3++;
-                ESP_LOGW(TAG,"Aumentando ATCOM");
-                error = 0;
+    		strncmp(aux,"\r\nALREADY CONNECTED",7) == 0 ||
+    		strncmp(aux,"\r\nOK",4) == 0){
+            ATCOM3++;
+            ESP_LOGW(TAG,"Aumentando ATCOM");
+            error = 0;
         }else if(strncmp(aux,"\r\nERROR",7) == 0){
-        	ESP_LOGE(TAG,"%d- Dio Error",ATCOM3+40);
+        	ESP_LOGE(TAG,"CIPSTART- TEMP Dio Error");
             error++;
-        if (error >= 3){
+            if (error >= 3){
+            	ATCOM3 = CPOWD3;
+            }
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- HUM PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
         	ATCOM3 = CPOWD3;
-        }
         }
         bzero(aux, BUF_SIZE);
         size = 0;
@@ -594,20 +675,25 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
     case CIPSTART2:
     	//Para esperar el connect ok
     	ESP_LOGW(TAG, "Connect ok \r\n");
-        	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
-        	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
-        		strncmp(aux,"\r\nALREADY CONNECTED",7) == 0){
-        		ATCOM3++;
-        		ESP_LOGW(TAG,"Aumentando ATCOM");
-        		error = 0;
-        		vTaskDelay(2000 / portTICK_PERIOD_MS);
-        	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-        		ESP_LOGE(TAG,"%d- Dio Error",ATCOM3+40);
-        		error++;
-        		if (error >= 3){
-        			ATCOM3 = CPOWD3;
-        		}
+        Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+        if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+        	strncmp(aux,"\r\nALREADY CONNECTED",7) == 0){
+        	ATCOM3++;
+        	ESP_LOGW(TAG,"Aumentando ATCOM");
+        	error = 0;
+        	vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- TEMP Dio Error");
+        	error++;
+        	if (error >= 3){
+        		ATCOM3 = CPOWD3;
         	}
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- HUM PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
         bzero(aux, BUF_SIZE);
         size = 0;
         break;
@@ -625,12 +711,17 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
                 error = 0;
                 ATCOM3++;
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-        		ESP_LOGE(TAG,"%d- Dio Error en el envio de temperatura",ATCOM3+40);
+        		ESP_LOGE(TAG,"CIPSEND- TEMP Dio Error");
         		error++;
         		if (error >= 3){
         			ATCOM3 = CPOWD3;
         		}
-        	}
+        	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSEND- HUM PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            }
         	bzero(aux, BUF_SIZE);
         	size = 0;
         	break;
@@ -642,21 +733,41 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
         	        ESP_LOGW(TAG,"Socket cerrado");
         	        a = 1;
                 }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
-                    ESP_LOGE(TAG,"%d- Dio error al enviar la temperatura",ATCOM3+40);
+                    ESP_LOGE(TAG,"CIPSEND2- TEMP Dio error");
                     error++;
                     if (error >= 3){
                     	ATCOM3 = CPOWD3;
                     }
+                } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+                	ESP_LOGE(TAG,"CIPSEND2- HUM PDP DEACT");
+                	error++;
+                	pdp_deact = 1;
+                	ATCOM3 = CPOWD3;
                 }
                 bzero(aux, BUF_SIZE);
                 size = 0;
             break;
         	case CPOWD3:
-        		a = 1;
-
+        		//Para apagar el sim800l
+               ESP_LOGW(TAG, "Apagar \r\n");
+               uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+               Tiempo_Espera(aux, ATCOM3+30,&size,error,t_CPOWD);
+               if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+            	   ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	   error = 0;
+            	   a = 1;
+               } else {
+            	   ESP_LOGE(TAG,"CPOWD3- Dio Error");
+            	   error++;
+            	   if (error >= 3){
+            		   error = 0;
+            		   a = 1;
+            	   }
+               }
+               bzero(aux, BUF_SIZE);
+               size = 0;
         	break;
 	}
-	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_hum[Thum2->pos_temp-1] );
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 }
@@ -888,10 +999,11 @@ void Mandar_mensaje(void *P)
 	   	xEventGroupClearBits(event_group, SYNC_BIT_TASK1);
 	    xEventGroupClearBits(event_group, SYNC_BIT_TASK2);
 
-	    ESP_LOGW(TAG, "Apagare y prendere\r\n");
+
 
 	    /* Apagar el modulo por si esta prendido al entrar en la tarea */
     	if  (prender_apagar == 0){
+    		ESP_LOGW(TAG, "Apagare y prendere\r\n");
     	    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
     	    vTaskDelay(2000 / portTICK_PERIOD_MS);
     	    Prender_SIM800l();
@@ -940,22 +1052,19 @@ void Mandar_mensaje(void *P)
 
 
     //Si se logro configurar correctamente y activar el GPRS se enviando los datos
-    if (ATCOM2 != CPOWD2 && ATCOM2 != CFUN ){
+    if (ATCOM2 != CPOWD2 && pdp_deact == 0 ){
     	Enviar_GPRS(&gps_data2,&Thum2);
     }
 
-    //Se reinician las variables para el siguiente ciclo
-
-	if (ATCOM == CPOWD || ATCOM2 == CPOWD2){
-		//prender_apagar = 0;
-	}
-
- //   config_sim800 = 0;
+	//Verifico si no se apago o si dio error de pdp_deact
+	//para que en la siguiente vuelta apague y prenda el sim800
+    if( pdp_deact == 1 || ATCOM == CPOWD || ATCOM2 == CPOWD2 ){
+    	prender_apagar = 0;
+    }
+    //Reinicio los valores de ATCOM para la siguiente ronda
 	ATCOM = CMGF;
 	ATCOM2 = CFUN;
-    ESP_LOGI(TAG, "Power down");
-    uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 	}
 }
 

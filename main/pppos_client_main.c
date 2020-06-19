@@ -190,6 +190,8 @@ static void  Envio_mensaje(char* mensaje, uint8_t tamano)
 		uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 2);
 	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
 		ESP_LOGE("Mensaje","No se pudo mandar el mensaje");
+	}else if (error >= 1){
+		jail = 1;
 	}
     ESP_LOGW(TAG, "Mensaje2 \r\n");
     //Aqui espero la respuesta al envio de mensaje para poder terminar la tarea y no molestar
@@ -201,7 +203,7 @@ static void  Envio_mensaje(char* mensaje, uint8_t tamano)
     	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
     		ESP_LOGE(TAG,"21- Dio Error");
     		error++;
-    		if (error >= 5){
+    		if (error >= 1){
     			ESP_LOGE(TAG,"21- No se mando el mensaje Error");
     			break;
     		}
@@ -394,7 +396,7 @@ static e_ATCOM2  Configurar_GPRS(e_ATCOM2 ATCOM)
             }else if(strncmp(aux,"\r\nERROR",7) == 0 ){
             	ESP_LOGE(TAG,"CIICR- Dio error");
             	flags_errores++;
-            	if (flags_errores >= 3){
+            	if (flags_errores >= 2){
             		ATCOM = CPOWD2;
             	}
             }else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -519,7 +521,7 @@ while (a == 0){
         }else if(strncmp(aux,"\r\nERROR",7) == 0){
         	ESP_LOGE(TAG,"CIPSTART- TEMP Dio Error");
             error++;
-            if (error >= 3){
+            if (error >= 2){
             	ATCOM3 = CPOWD3;
             }
         } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -544,7 +546,7 @@ while (a == 0){
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
         		ESP_LOGE(TAG,"CIPSTART2- TEMP Dio Error");
         		error++;
-        		if (error >= 3){
+        		if (error >= 2){
         			ATCOM3 = CPOWD3;
         		}
         	}else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -572,7 +574,7 @@ while (a == 0){
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
         		ESP_LOGE(TAG,"CIPSEND- TEMP Dio Error");
         		error++;
-        		if (error >= 3){
+        		if (error >= 2){
         			ATCOM3 = CPOWD3;
         		}
         	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -594,7 +596,7 @@ while (a == 0){
                 }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
                     ESP_LOGE(TAG,"CIPSEND2- TEMP Dio error");
                     error++;
-                    if (error >= 3){
+                    if (error >= 2){
                     	ATCOM3 = CPOWD3;
                     }
                 } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -608,26 +610,23 @@ while (a == 0){
             break;
         	case CPOWD3:
         		//Para apagar el sim800l
- /*               ESP_LOGW(TAG, "Apagar \r\n");
+                ESP_LOGW(TAG, "Apagar \r\n");
                 uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
-                Tiempo_Espera(aux, ATCOM+30,&size,error,t_CPOWD);
+                Tiempo_Espera(aux, ATCOM3+30,&size,error,t_CPOWD);
                 if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
-                	ESP_LOGW(TAG,"Se apago el modulo SIM800L");
-                	flags_errores = 0;
+             	   ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+             	   error = 0;
+             	   a = 1;
                 } else {
-                	ESP_LOGE(TAG,"CPOWD2- Dio Error");
-                	flags_errores++;
-                	if (flags_errores >= 3){
-                 		flags_errores = 0;
-                 		a = 1;
-                	}
+             	   ESP_LOGE(TAG,"CPOWD3- Dio Error");
+             	   error++;
+             	   if (error >= 3){
+             		   error = 0;
+             		   a = 1;
+             	   }
                 }
                 bzero(aux, BUF_SIZE);
-                size = 0;*/
-
-        		//Si apaga enviando la temperatura, al enviar la humedad esperara mucho por respuesta
-        		//Si lo apago en la humendad no ocurrira este inconveniente
-        		a = 1;
+                size = 0;
         	break;
 	}
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -640,7 +639,6 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
 	char message[318] = "Welcome to ESP32!";
 	char aux[BUF_SIZE] = "";
 	uint16_t size = 0, a = 0;
-	e_TEspera T_Espera;
 	uint8_t error = 0;
 	e_ATCOM3 ATCOM3 = 0;
 
@@ -660,7 +658,7 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
         }else if(strncmp(aux,"\r\nERROR",7) == 0){
         	ESP_LOGE(TAG,"CIPSTART- TEMP Dio Error");
             error++;
-            if (error >= 3){
+            if (error >= 2){
             	ATCOM3 = CPOWD3;
             }
         } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -685,7 +683,7 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
         }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
         	ESP_LOGE(TAG,"CIPSTART2- TEMP Dio Error");
         	error++;
-        	if (error >= 3){
+        	if (error >= 2){
         		ATCOM3 = CPOWD3;
         	}
         } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -713,7 +711,7 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
         	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
         		ESP_LOGE(TAG,"CIPSEND- TEMP Dio Error");
         		error++;
-        		if (error >= 3){
+        		if (error >= 2){
         			ATCOM3 = CPOWD3;
         		}
         	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -735,7 +733,7 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
                 }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
                     ESP_LOGE(TAG,"CIPSEND2- TEMP Dio error");
                     error++;
-                    if (error >= 3){
+                    if (error >= 2){
                     	ATCOM3 = CPOWD3;
                     }
                 } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
@@ -909,12 +907,287 @@ static void  Envio_GPRS_Lat(gps_data_t* gps_data3){
 	}
 }
 
+
+static void  Envio_GPRS_Lon(gps_data_t* gps_data3){
+	//Esta funcion envia los datos a thingspeak
+
+	char message[318] = "Welcome to ESP32!";
+	char aux[BUF_SIZE] = "";
+	uint16_t size = 0, a = 0;
+	uint8_t error = 0;
+	e_ATCOM3 ATCOM3 = 0;
+
+	while (a == 0){
+	switch (ATCOM3){
+    case CIPSTART:
+    	//Para inciar la comunicacion con thingspeak
+    	ESP_LOGW(TAG, "CIPSTART 1\r\n");
+    	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
+    	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+    	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+    		strncmp(aux,"\r\nALREADY CONNECTED",7) == 0 ||
+    		strncmp(aux,"\r\nOK",4) == 0){
+            ATCOM3++;
+            ESP_LOGW(TAG,"Aumentando ATCOM");
+            error = 0;
+        }else if(strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- LON Dio Error");
+            error++;
+            if (error >= 3){
+            	ATCOM3 = CPOWD3;
+            }
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- LON PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+	break;
+    case CIPSTART2:
+    	//Para esperar el connect ok
+    	ESP_LOGW(TAG, "Connect ok \r\n");
+        Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+        if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+        	strncmp(aux,"\r\nALREADY CONNECTED",7) == 0){
+        	ATCOM3++;
+        	ESP_LOGW(TAG,"Aumentando ATCOM");
+        	error = 0;
+        	vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- LON Dio Error");
+        	error++;
+        	if (error >= 3){
+        		ATCOM3 = CPOWD3;
+        	}
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- LON PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+        break;
+        case CIPSEND:
+        	//Para mandar datos a thingspeak
+            ESP_LOGW(TAG, "CIPSEND\r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=79\r\n", 15);
+            Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+            if(strncmp(aux,"\r\n>",3) == 0){
+            	//para la latitud y longitud con lenght de 75
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field4=%.4f\r\n", gps_data3->longitude_prom);
+            	uart_write_bytes(UART_NUM_1,message,79);
+                ESP_LOGW(TAG,"Longitud enviada");
+                error = 0;
+                ATCOM3++;
+        	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        		ESP_LOGE(TAG,"CIPSEND- LON Dio Error");
+        		error++;
+        		if (error >= 3){
+        			ATCOM3 = CPOWD3;
+        		}
+        	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSEND- LON PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            }
+        	bzero(aux, BUF_SIZE);
+        	size = 0;
+        	break;
+        	case CIPSEND2:
+        		//Para eseprar la respuesta
+        	    ESP_LOGW(TAG, "CIPSEND2\r\n");
+        	    Tiempo_Espera(aux, 42,&size,error,t_CIPSEND);
+        	    if(strncmp(aux,"\r\nCLOSED",8) == 0){
+        	        ESP_LOGW(TAG,"Socket cerrado");
+        	        a = 1;
+                }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+                    ESP_LOGE(TAG,"CIPSEND2- LON Dio error");
+                    error++;
+                    if (error >= 3){
+                    	ATCOM3 = CPOWD3;
+                    }
+                } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+                	ESP_LOGE(TAG,"CIPSEND2- LON PDP DEACT");
+                	error++;
+                	pdp_deact = 1;
+                	ATCOM3 = CPOWD3;
+                }
+                bzero(aux, BUF_SIZE);
+                size = 0;
+            break;
+        	case CPOWD3:
+        		//Para apagar el sim800l
+               ESP_LOGW(TAG, "Apagar \r\n");
+               uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+               Tiempo_Espera(aux, ATCOM3+30,&size,error,t_CPOWD);
+               if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+            	   ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	   error = 0;
+            	   a = 1;
+               } else {
+            	   ESP_LOGE(TAG,"CPOWD3- Dio Error");
+            	   error++;
+            	   if (error >= 3){
+            		   error = 0;
+            		   a = 1;
+            	   }
+               }
+               bzero(aux, BUF_SIZE);
+               size = 0;
+        	break;
+	}
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+
+static void  Envio_GPRS_Puerta(){
+	//Esta funcion envia los datos a thingspeak
+
+	char message[318] = "Welcome to ESP32!";
+	char aux[BUF_SIZE] = "";
+	uint16_t size = 0, a = 0;
+	uint8_t error = 0;
+	e_ATCOM3 ATCOM3 = 0;
+
+	while (a == 0){
+	switch (ATCOM3){
+    case CIPSTART:
+    	//Para inciar la comunicacion con thingspeak
+    	ESP_LOGW(TAG, "CIPSTART 1\r\n");
+    	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
+    	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+    	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+    		strncmp(aux,"\r\nALREADY CONNECTED",7) == 0 ||
+    		strncmp(aux,"\r\nOK",4) == 0){
+            ATCOM3++;
+            ESP_LOGW(TAG,"Aumentando ATCOM");
+            error = 0;
+        }else if(strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- PUERTA Dio Error");
+            error++;
+            if (error >= 3){
+            	ATCOM3 = CPOWD3;
+            }
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- PUERTA PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+	break;
+    case CIPSTART2:
+    	//Para esperar el connect ok
+    	ESP_LOGW(TAG, "Connect ok \r\n");
+        Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+        if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+        	strncmp(aux,"\r\nALREADY CONNECTED",7) == 0){
+        	ATCOM3++;
+        	ESP_LOGW(TAG,"Aumentando ATCOM");
+        	error = 0;
+        	vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- PUERTA Dio Error");
+        	error++;
+        	if (error >= 3){
+        		ATCOM3 = CPOWD3;
+        	}
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- PUERTA PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+        break;
+        case CIPSEND:
+        	//Para mandar datos a thingspeak
+            ESP_LOGW(TAG, "CIPSEND\r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=75\r\n", 15);
+            Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+            if(strncmp(aux,"\r\n>",3) == 0){
+            	//para la latitud y longitud con lenght de 75
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field5=100\r\n");
+            	uart_write_bytes(UART_NUM_1,message,75);
+                ESP_LOGW(TAG,"Longitud enviada");
+                error = 0;
+                ATCOM3++;
+        	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        		ESP_LOGE(TAG,"CIPSEND- LON Dio Error");
+        		error++;
+        		if (error >= 3){
+        			ATCOM3 = CPOWD3;
+        		}
+        	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSEND- LON PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            }
+        	bzero(aux, BUF_SIZE);
+        	size = 0;
+        	break;
+        	case CIPSEND2:
+        		//Para eseprar la respuesta
+        	    ESP_LOGW(TAG, "CIPSEND2\r\n");
+        	    Tiempo_Espera(aux, 42,&size,error,t_CIPSEND);
+        	    if(strncmp(aux,"\r\nCLOSED",8) == 0){
+        	        ESP_LOGW(TAG,"Socket cerrado");
+        	        a = 1;
+                }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+                    ESP_LOGE(TAG,"CIPSEND2- LON Dio error");
+                    error++;
+                    if (error >= 3){
+                    	ATCOM3 = CPOWD3;
+                    }
+                } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+                	ESP_LOGE(TAG,"CIPSEND2- LON PDP DEACT");
+                	error++;
+                	pdp_deact = 1;
+                	ATCOM3 = CPOWD3;
+                }
+                bzero(aux, BUF_SIZE);
+                size = 0;
+            break;
+        	case CPOWD3:
+        		//Para apagar el sim800l
+               ESP_LOGW(TAG, "Apagar \r\n");
+               uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+               Tiempo_Espera(aux, ATCOM3+30,&size,error,t_CPOWD);
+               if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+            	   ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	   error = 0;
+            	   a = 1;
+               } else {
+            	   ESP_LOGE(TAG,"CPOWD3- Dio Error");
+            	   error++;
+            	   if (error >= 3){
+            		   error = 0;
+            		   a = 1;
+            	   }
+               }
+               bzero(aux, BUF_SIZE);
+               size = 0;
+        	break;
+	}
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+
 static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
 
 	// Esta funcion envia los datos correspondientes por GPRS a thingspeak
 
 	char message[318] = "Welcome to ESP32!";
-	char aux[BUF_SIZE] = "";
+//	char aux[BUF_SIZE] = "";
 
 
 	//El tiempo de espera entre datos de thingspeak es de 15 segundos
@@ -927,6 +1200,7 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     	    vTaskDelay(10000 / portTICK_PERIOD_MS);
     		Envio_GPRS_hum(Thum2);
     		ESP_LOGW("TAG", "Envio humedad por GPRS");
+    		vTaskDelay(10000 / portTICK_PERIOD_MS);
     	break;
     	case 1:
     		Envio_GPRS_temp(Thum2);
@@ -934,6 +1208,10 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     	    vTaskDelay(10000 / portTICK_PERIOD_MS);
     		Envio_GPRS_hum(Thum2);
     		ESP_LOGW("TAG", "Envio humedad por GPRS");
+    		//Si enviara datos gps necesito esperar
+    		if (gps_data2->error_gps == 0){
+    			vTaskDelay(10000 / portTICK_PERIOD_MS);
+    		}
     		if (limite_a == 0){
 			limite_b = 0;
     		}
@@ -953,12 +1231,14 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
         		Envio_GPRS_Lat(gps_data2);
         		ESP_LOGW("TAG", "Envio latitud por GPRS");
         	    vTaskDelay(10000 / portTICK_PERIOD_MS);
+        	    Envio_GPRS_Lon(gps_data2);
+        	    ESP_LOGW("TAG", "Envio longitud por GPRS");
         	} else{
         		 ESP_LOGI(TAG, "2-NO se conecto a la red GPS");
         	}
         } else{
   			gps_data.error_gps = 0;;
-    		ESP_LOGI(TAG, "2-No se comunico con el GPS");
+    		ESP_LOGI(TAG, "2-No se comunico con el modulo GPS");
         }
     break;
     case P_abierta:
@@ -966,16 +1246,20 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     	if (gps_data2->error_gps == 0){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
     		if (gps_data2->year == 20){
+    			Envio_GPRS_Puerta();
+    			ESP_LOGW("TAG", "Envio estado de puerta por GPRS");
+    			vTaskDelay(10000 / portTICK_PERIOD_MS);
         		Envio_GPRS_Lat(gps_data2);
         		ESP_LOGW("TAG", "Envio latitud por GPRS");
         	    vTaskDelay(10000 / portTICK_PERIOD_MS);
-    			ESP_LOGI(TAG, " abrio puertaEnviaria GPS");
+        	    Envio_GPRS_Lon(gps_data2);
+        	    ESP_LOGW("TAG", "Envio longitud por GPRS");
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
     			}
     	    } else{
-
+    	    	Envio_GPRS_Puerta();
     	    	ESP_LOGI(TAG, "Puerta abierta, sin conexion gps");
     			if (puerta_a == 0){
     				puerta_b = 0;
@@ -984,6 +1268,7 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     	    }
     	} else{
 			gps_data.error_gps = 0;
+			Envio_GPRS_Puerta();
 			ESP_LOGI(TAG, "2- Puerta abierta, no hay gps");
 			if (puerta_a == 0){
 				puerta_b = 0;
@@ -1126,7 +1411,6 @@ void Mandar_mensaje(void *P)
 	uint16_t size = 0;
 	e_ATCOM ATCOM = CMGF;
 	e_ATCOM2 ATCOM2 = CFUN;
-//	e_TEspera T_Espera;
 	gps_data_t gps_data2;
 	AM2301_data_t Thum2;
 	message_data_t message_data;
@@ -1159,7 +1443,7 @@ void Mandar_mensaje(void *P)
 	    }
 
     	//Recibo la informacion del gps
-	    if(xQueueReceive(xQueue_temp,&Thum2,(portTickType) 1500 / portTICK_PERIOD_MS)) {
+	    if(xQueueReceive(xQueue_gps,&gps_data2,(portTickType) 1500 / portTICK_PERIOD_MS)) {
 	    	sprintf(message_data.Latitude, "%f",gps_data2.latitude_prom);
 	    	sprintf(message_data.Longitude, "%f",gps_data2.longitude_prom);
 	    	sprintf(message_data.Latitude_dir, "%s",gps_data2.latitude_direct);
@@ -1167,7 +1451,7 @@ void Mandar_mensaje(void *P)
 	    } else {
 	    	gps_data2.error_gps = 1;
 	    }
-
+	    ESP_LOGE(TAG, "Error GPS es %d\r\n",gps_data2.error_gps);
 
     	//Verifico si se supero el limite de temperatura o se abrio la puerta para guardar la informacion
     	//en la memoria flash
@@ -1191,7 +1475,8 @@ void Mandar_mensaje(void *P)
     	}
     }
 
-
+    ESP_LOGE(TAG, "Error GPS es %d\r\n",gps_data2.error_gps);
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
     //Si se logro configurar correctamente y activar el GPRS se enviando los datos
     if (ATCOM2 != CPOWD2 && pdp_deact == 0 ){
     	Enviar_GPRS(&gps_data2,&Thum2);
@@ -1201,6 +1486,7 @@ void Mandar_mensaje(void *P)
 	//para que en la siguiente vuelta apague y prenda el sim800
     if( pdp_deact == 1 || ATCOM == CPOWD || ATCOM2 == CPOWD2 ){
     	prender_apagar = 0;
+    	pdp_deact = 0;
     }
     //Reinicio los valores de ATCOM para la siguiente ronda
 	ATCOM = CMGF;

@@ -24,24 +24,6 @@ typedef struct {
     char Temperatura[319];
 
 } message_data_t;
-/*
-typedef enum
-{
-	CFUN = 0,
-	CSTT,
-    CIICR,
-	CGREG,
-	CMGF,
-	CIFSR,
-	CPAS,
-	CMGS1,
-	CMGS,
-	CIPSTART,
-	CIPSTART2,
-	CIPSEND,
-	CIPSEND2,
-	CPOWD,
-} e_ATCOM;*/
 
 
 typedef enum

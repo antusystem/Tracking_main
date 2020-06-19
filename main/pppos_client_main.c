@@ -772,6 +772,143 @@ static void  Envio_GPRS_hum(AM2301_data_t* Thum2){
 	}
 }
 
+static void  Envio_GPRS_Lat(gps_data_t* gps_data3){
+	//Esta funcion envia los datos a thingspeak
+
+	char message[318] = "Welcome to ESP32!";
+	char aux[BUF_SIZE] = "";
+	uint16_t size = 0, a = 0;
+	uint8_t error = 0;
+	e_ATCOM3 ATCOM3 = 0;
+
+	while (a == 0){
+	switch (ATCOM3){
+    case CIPSTART:
+    	//Para inciar la comunicacion con thingspeak
+    	ESP_LOGW(TAG, "CIPSTART 1\r\n");
+    	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
+    	Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+    	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+    		strncmp(aux,"\r\nALREADY CONNECTED",7) == 0 ||
+    		strncmp(aux,"\r\nOK",4) == 0){
+            ATCOM3++;
+            ESP_LOGW(TAG,"Aumentando ATCOM");
+            error = 0;
+        }else if(strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- LAT Dio Error");
+            error++;
+            if (error >= 3){
+            	ATCOM3 = CPOWD3;
+            }
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- LAT PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+	break;
+    case CIPSTART2:
+    	//Para esperar el connect ok
+    	ESP_LOGW(TAG, "Connect ok \r\n");
+        Tiempo_Espera(aux, ATCOM3+40,&size,error,t_CIPSTART);
+        if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+        	strncmp(aux,"\r\nALREADY CONNECTED",7) == 0){
+        	ATCOM3++;
+        	ESP_LOGW(TAG,"Aumentando ATCOM");
+        	error = 0;
+        	vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- LAT Dio Error");
+        	error++;
+        	if (error >= 3){
+        		ATCOM3 = CPOWD3;
+        	}
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- LAT PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+        break;
+        case CIPSEND:
+        	//Para mandar datos a thingspeak
+            ESP_LOGW(TAG, "CIPSEND\r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=79\r\n", 15);
+            Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+            if(strncmp(aux,"\r\n>",3) == 0){
+            	//para la latitud y longitud con lenght de 75
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field3=%.4f\r\n", gps_data3->latitude_prom);
+            	uart_write_bytes(UART_NUM_1,message,79);
+                ESP_LOGW(TAG,"Latitud enviada");
+                error = 0;
+                ATCOM3++;
+        	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        		ESP_LOGE(TAG,"CIPSEND- LAT Dio Error");
+        		error++;
+        		if (error >= 3){
+        			ATCOM3 = CPOWD3;
+        		}
+        	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSEND- LAT PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            }
+        	bzero(aux, BUF_SIZE);
+        	size = 0;
+        	break;
+        	case CIPSEND2:
+        		//Para eseprar la respuesta
+        	    ESP_LOGW(TAG, "CIPSEND2\r\n");
+        	    Tiempo_Espera(aux, 42,&size,error,t_CIPSEND);
+        	    if(strncmp(aux,"\r\nCLOSED",8) == 0){
+        	        ESP_LOGW(TAG,"Socket cerrado");
+        	        a = 1;
+                }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+                    ESP_LOGE(TAG,"CIPSEND2- LAT Dio error");
+                    error++;
+                    if (error >= 3){
+                    	ATCOM3 = CPOWD3;
+                    }
+                } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+                	ESP_LOGE(TAG,"CIPSEND2- LAT PDP DEACT");
+                	error++;
+                	pdp_deact = 1;
+                	ATCOM3 = CPOWD3;
+                }
+                bzero(aux, BUF_SIZE);
+                size = 0;
+            break;
+        	case CPOWD3:
+        		//Para apagar el sim800l
+               ESP_LOGW(TAG, "Apagar \r\n");
+               uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+               Tiempo_Espera(aux, ATCOM3+30,&size,error,t_CPOWD);
+               if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+            	   ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	   error = 0;
+            	   a = 1;
+               } else {
+            	   ESP_LOGE(TAG,"CPOWD3- Dio Error");
+            	   error++;
+            	   if (error >= 3){
+            		   error = 0;
+            		   a = 1;
+            	   }
+               }
+               bzero(aux, BUF_SIZE);
+               size = 0;
+        	break;
+	}
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+
 static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
 
 	// Esta funcion envia los datos correspondientes por GPRS a thingspeak
@@ -813,7 +950,9 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
         if (gps_data2->error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
         	if (gps_data2->year == 20){
-        		ESP_LOGI(TAG, "Enviaria GPS");
+        		Envio_GPRS_Lat(gps_data2);
+        		ESP_LOGW("TAG", "Envio latitud por GPRS");
+        	    vTaskDelay(10000 / portTICK_PERIOD_MS);
         	} else{
         		 ESP_LOGI(TAG, "2-NO se conecto a la red GPS");
         	}
@@ -827,15 +966,17 @@ static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
     	if (gps_data2->error_gps == 0){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
     		if (gps_data2->year == 20){
-
-    			 ESP_LOGI(TAG, " abrio puertaEnviaria GPS");
+        		Envio_GPRS_Lat(gps_data2);
+        		ESP_LOGW("TAG", "Envio latitud por GPRS");
+        	    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    			ESP_LOGI(TAG, " abrio puertaEnviaria GPS");
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
     			}
     	    } else{
 
-    	    	 ESP_LOGI(TAG, "Puerta abierta, sin conexion gps");
+    	    	ESP_LOGI(TAG, "Puerta abierta, sin conexion gps");
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;

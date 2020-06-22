@@ -71,6 +71,76 @@ extern QueueHandle_t xQueue_gps;
 
 static const char *TAG1 = "uart_echo_example";
 
+
+
+static void  Guardar_coma(char* auxc2_echo, uint16_t* posicion_echo)
+{
+	// Esta funcion prende el modulo sim800 y le da un tiempo para que se conecte a la radiobase
+	int i2 = 0;
+	//En este for escanea el buffer por la posicion de $
+	for (uint16_t i = 0; i < len; i++){
+		if (auxc2_echo[i] == '$' ){
+				posicion_echo[i2] = i;
+				/*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
+				ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
+				i2++;
+		}
+	}
+}
+
+static NMEA_data_t  Dividir_oraciones(NMEA_data_t NMEA_data, char* buf, uint16_t* posicion_echo)
+{
+		// Empezare a guardar en el struct escaladamente segun la posicion de $
+		// Se guardara cada oracion por separado
+		int i3 = 0;
+		for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
+			NMEA_data.NMEA_GNGGA[i3]= buf[i];
+		    i3++;
+		}
+		i3 = 0;
+		for (int i = posicion_echo[1] + 1; i < (posicion_echo[2]-1); i++){
+			NMEA_data.NMEA_GPGSA[i3]= buf[i];
+		    i3++;
+		}
+		i3 = 0;
+		for (int i = posicion_echo[2] + 1; i < (posicion_echo[3]-1); i++){
+		    NMEA_data.NMEA_BDGSA[i3]= buf[i];
+		    i3++;
+		}
+		i3 = 0;
+		for (int i = posicion_echo[3] + 1; i < (posicion_echo[4]-1); i++){
+		    NMEA_data.NMEA_GPGSV1[i3]= buf[i];
+		    i3++;
+		}
+		//Cuando se conecte a los satelites mandara de 3 a 12 oraciones GPGSV, por lo que
+		// se guarda la primera y se espera los siguientes datos, comprobando que comience por B
+		// la siguiente oracion y no por G
+		for (int j = 4; j < 10; j++){
+		    //j = 4 porque se ve de las siguientes oraciones donde esta la B
+		    //para empezar a guardar
+		    i3 = 0;
+		    if (buf[posicion_echo[j]+1] == 'B'){
+		        for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
+		        	NMEA_data.NMEA_BDGSV[i3]= buf[i];
+		        	i3++;
+		        }
+		        i3 = 0;
+		        for (int i = posicion_echo[j+1] + 1; i < (posicion_echo[j+2]-1); i++){
+		        	NMEA_data.NMEA_GNRMC[i3]= buf[i];
+		        	i3++;
+		        }
+		        i3 = 0;
+		        for (int i = posicion_echo[j+2] + 1; i < (posicion_echo[j+2]+39); i++){
+		        	NMEA_data.NMEA_GNVTG[i3]= buf[i];
+		        	i3++;
+		        }
+		    }
+		}
+		return (NMEA_data);
+}
+
+
+
 static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 	//Esta funcion ordena los datos de RMC
@@ -762,62 +832,14 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        		//	ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
     	        			auxi2_echo = 1;
 
-    	        			int i2 = 0;
-    	        			//En este for escanea el buffer por la posicion de $
-    	        			for (uint16_t i = 0; i < len; i++){
-    	        				if (auxc2_echo[i] == '$' ){
-    	        						posicion_echo[i2] = i;
-    	        						/*	ESP_LOGI(TAG1,"Posicion [%d] es: %d\r\n",i2,posicion[i2]);
-    	        						ESP_LOGI(TAG1,"auxc2 [%d] es: %c\r\n",i2,auxc2[i]);*/
-    	        						i2++;
-    	        				}
-    	        			}
+
+    	        			Guardar_coma(auxc2_echo,&posicion_echo);
+
     	        			// Empezare a guardar en el struct escaladamente segun la posicion de $
     	        			// Se guardara cada oracion por separado
-    	        			int i3 = 0;
-    	        			for (int i = posicion_echo[0] + 1; i < (posicion_echo[1]-1); i++){
-    	        				NMEA_data.NMEA_GNGGA[i3]= tx_buf[i];
-    	        			    i3++;
-    	        			}
-    	        			i3 = 0;
-    	        			for (int i = posicion_echo[1] + 1; i < (posicion_echo[2]-1); i++){
-    	        				NMEA_data.NMEA_GPGSA[i3]= tx_buf[i];
-    	        			    i3++;
-    	        			}
-    	        			i3 = 0;
-    	        			for (int i = posicion_echo[2] + 1; i < (posicion_echo[3]-1); i++){
-    	        			    NMEA_data.NMEA_BDGSA[i3]= tx_buf[i];
-    	        			    i3++;
-    	        			}
-    	        			i3 = 0;
-    	        			for (int i = posicion_echo[3] + 1; i < (posicion_echo[4]-1); i++){
-    	        			    NMEA_data.NMEA_GPGSV1[i3]= tx_buf[i];
-    	        			    i3++;
-    	        			}
-    	        			//Cuando se conecte a los satelites mandara de 3 a 12 oraciones GPGSV, por lo que
-    	        			// se guarda la primera y se espera los siguientes datos, comprobando que comience por B
-    	        			// la siguiente oracion y no por G
-    	        			for (int j = 4; j < 10; j++){
-    	        			    //j = 4 porque se ve de las siguientes oraciones donde esta la B
-    	        			    //para empezar a guardar
-    	        			    i3 = 0;
-    	        			    if (tx_buf[posicion_echo[j]+1] == 'B'){
-    	        			        for (int i = posicion_echo[j] + 1; i < (posicion_echo[j+1]-1); i++){
-    	        			        	NMEA_data.NMEA_BDGSV[i3]= tx_buf[i];
-    	        			        	i3++;
-    	        			        }
-    	        			        i3 = 0;
-    	        			        for (int i = posicion_echo[j+1] + 1; i < (posicion_echo[j+2]-1); i++){
-    	        			        	NMEA_data.NMEA_GNRMC[i3]= tx_buf[i];
-    	        			        	i3++;
-    	        			        }
-    	        			        i3 = 0;
-    	        			        for (int i = posicion_echo[j+2] + 1; i < (posicion_echo[j+2]+39); i++){
-    	        			        	NMEA_data.NMEA_GNVTG[i3]= tx_buf[i];
-    	        			        	i3++;
-    	        			        }
-    	        			    }
-    	        			}
+
+    	        			NMEA_data = Dividir_oraciones(NMEA_data,auxc2_echo,&posicion_echo);
+
 
     	        		/*	ESP_LOGI(TAG1,"GPGSA es: %s\r\n",NMEA_data.NMEA_GPGSA);
     	        			ESP_LOGI(TAG1,"BDGSA es: %s\r\n",NMEA_data.NMEA_BDGSA);

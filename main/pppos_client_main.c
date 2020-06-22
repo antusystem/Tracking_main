@@ -194,6 +194,7 @@ static void  Envio_mensaje(char* mensaje, uint8_t tamano)
 		jail = 1;
 	}
     ESP_LOGW(TAG, "Mensaje2 \r\n");
+    vTaskDelay(500 / portTICK_PERIOD_MS);
     //Aqui espero la respuesta al envio de mensaje para poder terminar la tarea y no molestar
     // en el siguiente mensaje
     while (jail == 0){
@@ -499,11 +500,6 @@ static void  Envio_GPRS_temp(AM2301_data_t* Thum2){
 	uint8_t error = 0;
 	e_ATCOM3 ATCOM3 = 0;
 
-	ESP_LOGE("DATOS A ENVIAR", "ENVIO %d",(int) Thum2->Prom_temp[Thum2->pos_temp-1] );
-    ESP_LOGE("DATOS A ENVIAR", "La posicion es %d",Thum2->pos_temp-1);
- //   ESP_LOGE("DATOS A ENVIAR", "El promedio es %d",(int)promedio);
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-
 
 while (a == 0){
 	switch (ATCOM3){
@@ -561,13 +557,13 @@ while (a == 0){
         case CIPSEND:
         	//Para mandar datos a thingspeak
             ESP_LOGW(TAG, "CIPSEND\r\n");
-            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=75\r\n", 15);
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=77\r\n", 15);
             Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
             vTaskDelay(500 / portTICK_PERIOD_MS);
             if(strncmp(aux,"\r\n>",3) == 0){
             	//para la temperatura y humedad con lenght de 75
-            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%d\r\n",(int) Thum2->Prom_temp[Thum2->pos_temp-1]);
-            	uart_write_bytes(UART_NUM_1,message,75);
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field1=%.1f\r\n",Thum2->Prom_temp[Thum2->pos_temp-1]);
+            	uart_write_bytes(UART_NUM_1,message,77);
                 ESP_LOGW(TAG,"Temperatura enviada");
                 error = 0;
                 ATCOM3++;
@@ -835,13 +831,13 @@ static void  Envio_GPRS_Lat(gps_data_t* gps_data3){
         case CIPSEND:
         	//Para mandar datos a thingspeak
             ESP_LOGW(TAG, "CIPSEND\r\n");
-            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=79\r\n", 15);
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=81\r\n", 15);
             Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
             vTaskDelay(300 / portTICK_PERIOD_MS);
             if(strncmp(aux,"\r\n>",3) == 0){
             	//para la latitud y longitud con lenght de 75
-            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field3=%.4f\r\n", gps_data3->latitude_prom);
-            	uart_write_bytes(UART_NUM_1,message,79);
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field3=%.6f\r\n", gps_data3->latitude_prom);
+            	uart_write_bytes(UART_NUM_1,message,81);
                 ESP_LOGW(TAG,"Latitud enviada");
                 error = 0;
                 ATCOM3++;
@@ -973,13 +969,13 @@ static void  Envio_GPRS_Lon(gps_data_t* gps_data3){
         case CIPSEND:
         	//Para mandar datos a thingspeak
             ESP_LOGW(TAG, "CIPSEND\r\n");
-            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=79\r\n", 15);
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=81\r\n", 15);
             Tiempo_Espera(aux,40,&size,error,t_CIPSEND);
             vTaskDelay(300 / portTICK_PERIOD_MS);
             if(strncmp(aux,"\r\n>",3) == 0){
             	//para la latitud y longitud con lenght de 75
-            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field4=%.4f\r\n", gps_data3->longitude_prom);
-            	uart_write_bytes(UART_NUM_1,message,79);
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field4=%.6f\r\n", gps_data3->longitude_prom);
+            	uart_write_bytes(UART_NUM_1,message,81);
                 ESP_LOGW(TAG,"Longitud enviada");
                 error = 0;
                 ATCOM3++;
@@ -1283,9 +1279,8 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
 {
 	//Esta funcion se encarga de enviar el mensaje de texto adecuado
 	char message[318] = "Welcome to ESP32!";
-	char aux[BUF_SIZE] = "";
+//	char aux[BUF_SIZE] = "";
 	uint16_t size = 0;
-	e_TEspera T_Espera;
 	uint8_t error = 0;
 
     if (Thum2->error_temp == 0){
@@ -1311,16 +1306,19 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
     	ESP_LOGI(TAG, "Send send message [%s] ok", message);
     }
 
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    bzero(message,318);
+
     switch (puerta_b){
     case P_cerrada:
     // Verifico si no hubo error al conectarse a al modulo GPS
         if (gps_data2->error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
         	if (gps_data2->year == 20){
-			    sprintf(message,"La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
-			    Envio_mensaje(message,87);
+			    sprintf(message,"La latitud es: %.6f %s y la longitud es: %.6f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
+			    Envio_mensaje(message,91);
 			    ESP_LOGI(TAG, "Send send message [%s] ok", message);
-
+			    bzero(message,318);
         		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2->day,gps_data2->mes,gps_data2->year,gps_data2->hour,gps_data2->minute,gps_data2->second);
         		Envio_mensaje(message,112);
         		ESP_LOGI(TAG, "Send send message [%s] ok", message);
@@ -1343,14 +1341,14 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
     		if (gps_data2->year == 20){
 
-    			 sprintf(message,"La puerta fue abierta. La latitud es: %.4f %s y la longitud es: %.4f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
-    			 Envio_mensaje(message,87);
+    			 sprintf(message,"La puerta fue abierta. La latitud es: %.6f %s y la longitud es: %.6f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
+    			 Envio_mensaje(message,91);
     			 ESP_LOGI(TAG, "Send send message [%s] ok", message);
     			if (puerta_a == 0){
     				puerta_b = 0;
     				puerta_c = 0;
     			}
-
+    			 bzero(message,318);
     	         sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2->day,gps_data2->mes,gps_data2->year,gps_data2->hour,gps_data2->minute,gps_data2->second);
     	         Envio_mensaje(message,112);
     	         ESP_LOGI(TAG, "Send send message [%s] ok", message);

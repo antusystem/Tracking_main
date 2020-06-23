@@ -1,3 +1,7 @@
+/* AM2301
+ * Se encarga de comunicarse con el sensor AM2301, organizar los datos de temperatura y humedad
+ * para luego enviarlos por cola
+*/
 #include "dht.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

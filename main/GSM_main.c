@@ -1,4 +1,6 @@
-/*
+/*GSM_main
+ * El main del sistema, se encarga de recibir los datos GPS y de temperatura
+ * para luego enviarlos por mensaje de texto y por GPRS a thingspeak
 
 */
 #include "dht.h"
@@ -1376,8 +1378,9 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
     }
 }
 
-//Escribir en la memoria flash
+
 void set_form_flash_init( message_data_t *datos){
+	//Escribir en la memoria flash
 	esp_err_t err;
 	nvs_handle_t ctrl_flash;
 	err = nvs_open("storage",NVS_READWRITE,&ctrl_flash);

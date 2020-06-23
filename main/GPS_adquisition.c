@@ -1,8 +1,6 @@
-/* UART Echo Example
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
+/* GPS_adquisition
+ * Se encarga de pedir, recolectar, organizar y enviar los datos obtendios
+ * de la GNSS por GPS y BDS
 */
 #include <stdio.h>
 #include <string.h>
@@ -36,12 +34,6 @@ char auxc2_echo[BUF_SIZE] = "";
 //char auxc5_echo[1] = "$";
 //char auxc7_echo[1] = "B";
 
-
-
-
-//posicion echo es un arreglo para encontrar la posicion de los $ en el bus datos NMEA del GPS
-//uint16_t posicion_echo[13] = {0};
-
 //Variables globales para calcular promedios en varias funciones
 float prom_lon = 0;
 float prom_lat = 0;
@@ -50,7 +42,7 @@ float prom_lat = 0;
 uint8_t primera_vuelta = 0;
 uint8_t segunda_vuelta = 0;
 
-
+//Definir los pines del uart
 #define ECHO_TEST_TXD  (GPIO_NUM_18)
 #define ECHO_TEST_RXD  (GPIO_NUM_0)
 #define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
@@ -73,7 +65,7 @@ static const char *TAG1 = "uart_echo_example";
 
 
 
-static void  Guardar_coma(char* auxc2_echo, uint16_t* posicion_echo)
+static void  Guardar_dolar(char* auxc2_echo, uint16_t* posicion_echo)
 {
 	// Esta funcion prende el modulo sim800 y le da un tiempo para que se conecte a la radiobase
 	int i2 = 0;
@@ -604,7 +596,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
   void echo_task(void *arg)
 {
-	//Se inicia la tarea configurando los Uart 0 y Uart 2
+	//Se inicia la tarea configurando el Uart 2
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -613,23 +605,21 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_APB,
     };
- //   ESP_LOGI(TAG1, "Empezar a configurar Uart 0");
+
+    //El uart 0 ahora se configura en el main junto al uart 1
 /*    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, ECHO_TEST_RTS, ECHO_TEST_CTS);
 */
- //   ESP_LOGI(TAG1, "Uart 0 Iniciado");
+
  //   ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
 
     uart_param_config(UART_NUM_2, &uart_config);
     uart_set_pin(UART_NUM_2, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS);
     uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
-
-
-//    ESP_LOGI(TAG1, "Uart 2 Iniciado");
+//  ESP_LOGI(TAG1, "Uart 2 Iniciado");
 
     //Se declara la variable que copiara lo que llegue al buffer
-    //uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
     uint8_t tx_buf[BUF_SIZE];
 
     //Esta variable sirve para indicar cuando pedir que no siga enviando los datos GPS
@@ -647,11 +637,11 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     uint8_t len5 = 0;
     uint8_t len7 = 0;
 
+    //Inicio las variables necesarias en 0
     gps_data.ronda_error = 0;
     gps_data.error_gps = 0;
     gps_data.ronda = 0;
     gps_data.stage = 0;
-
 
 
     while (1) {
@@ -711,36 +701,24 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	if ((len3 > 0) || (len5 > 0) || (len7 > 0) ) {
     //	if (len3 + len5 + len7 > 0) {
 
-    		//Lee el uart
+    	  //Lee el uart
     	//	ESP_LOGI(TAG1, "Voy a leer el uart");
     	    len = uart_read_bytes(UART_NUM_2, (uint8_t*)tx_buf, BUF_SIZE, pdMS_TO_TICKS(10));
-    	//    ESP_LOGI(TAG1, "len es: %d",len);
+    	//  ESP_LOGI(TAG1, "len es: %d",len);
 
-
-    	    //Se comprueba si llego algo al uart y se publica que llego
+    	  //Se comprueba si llego algo al uart y se publica que llego
     	    if(len>0){
-    	     //	ESP_LOGI(TAG1, "Borrare auxc2");
+
     	     	// Borrar lo que tenia antes auxc2
     	     	bzero(auxc2_echo,BUF_SIZE);
-    	     	// Mostar que se borro todo
-    	    // 	ESP_LOGI(TAG1, "Se vacio, auxc2 es: %s",auxc2_echo);
-    	     	// Copiar lo que esta en el buffer de recepcion
 
-
-    	     	//Se copia lo que llego al buffer, las primeras 2 veces no hace falta que
-    	     	//tenga una dimension tan grande el auxiliar
+    	     //Se copia lo que llego al buffer, las primeras 2 veces no hace falta que
+    	     //tenga una dimension tan grande el auxiliar
     	     	if (auxi1_echo < 2){
     	     		memcpy(auxc2_echo,tx_buf,20);
     	     	} else {
     	     		memcpy(auxc2_echo,tx_buf,BUF_SIZE);
     	     	}
-
-
-    	     	//Mostrar auxc2
-    	    // 	ESP_LOGI(TAG1, "Copio el buffer, auxc2 es: %s",auxc2_echo);
-    	     	//printf(" Copio el buffer, auxc2 es: %s",auxc2)
-    	 //    	ESP_LOGI(TAG1, " Ya termino auxc2");
-
 
 
     	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y "ATGPSRD"
@@ -764,6 +742,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
      	        	    		gps_data.ronda_error = 0;
      	        	    		gps_data.error_gps = 1;
      	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+     	        	    		xQueueOverwrite(xQueue_gps,&gps_data);
+     	        	    		//Mando el comando para resetear el A9G
      	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
      	        	    		len = 0;
      	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
@@ -790,6 +770,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
          	        	    		auxi1_echo = 0;
          	        	    		gps_data.error_gps = 1;
          	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+         	        	    		xQueueOverwrite(xQueue_gps,&gps_data);
+         	        	    		//Mando el comando para resetear el A9G
          	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
          	        	    		len = 0;
          	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
@@ -809,6 +791,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
          	        	    		gps_data.error_gps = 1;
          	        	    		auxi1_echo = 0;
          	        	    		ESP_LOGI(TAG1, "1- GPS error es 1 \r\n");
+         	        	    		xQueueOverwrite(xQueue_gps,&gps_data);
+         	        	    		//Mando el comando para resetear el A9G
          	        	    		len = uart_write_bytes(UART_NUM_2,"AT+RST=1\r\n", 10);
          	        	    		len = 0;
          	        	    		xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
@@ -829,17 +813,16 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	        	case 2:
     	        	    //Entrara aca despues de mandar AT+GPSRD=1
     	        	    //En este ciclo se encarga de separar las oraciones del bus NMEA del GPS
-    	        		//	ESP_LOGI(TAG1,"Entre en el ultimo ciclooooooooooooooo");
-    	        			auxi2_echo = 1;
+    	        		//	ESP_LOGI(TAG1,"Entre en el ultimo ciclo");
 
+    	        		auxi2_echo = 1;
+    	        	//  Encuentro y guardo la posicion del $ en el string que llego al uart
+    	        		Guardar_dolar(auxc2_echo,&posicion_echo);
 
-    	        			Guardar_coma(auxc2_echo,&posicion_echo);
+    	        		// Empezare a guardar en el struct escaladamente segun la posicion de $
+    	        		// Se guardara cada oracion por separado
 
-    	        			// Empezare a guardar en el struct escaladamente segun la posicion de $
-    	        			// Se guardara cada oracion por separado
-
-    	        			NMEA_data = Dividir_oraciones(NMEA_data,auxc2_echo,&posicion_echo);
-
+    	        		NMEA_data = Dividir_oraciones(NMEA_data,auxc2_echo,&posicion_echo);
 
     	        		/*	ESP_LOGI(TAG1,"GPGSA es: %s\r\n",NMEA_data.NMEA_GPGSA);
     	        			ESP_LOGI(TAG1,"BDGSA es: %s\r\n",NMEA_data.NMEA_BDGSA);
@@ -849,64 +832,59 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
 
     	        		//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
-    	        		//	GPS_parsing(NMEA_data.NMEA_GNGGA, gps_data);
 
-    	        			ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
-    	        			gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
-    	        			ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
-    	        			xQueueOverwrite(xQueue_gps,&gps_data);
-    	        			bzero(NMEA_data.NMEA_GNRMC,256);
-    	        			gps_data.stage = 0;
+    	        		ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
+    	        		gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
+    	        		ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
+    	        		//Envio los datos por cola
+    	        		xQueueOverwrite(xQueue_gps,&gps_data);
+    	        		//Borro la oracion que estoy ordenando para evitar problemas en el siguiente ciclo
+    	        		bzero(NMEA_data.NMEA_GNRMC,256);
+    	        		gps_data.stage = 0;
 
-    	        			if (segunda_vuelta == 0){
-    	        				if (gps_data.ronda == 10 ){
-    	        					segunda_vuelta = 1;
-    	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
-    	        					gps_data.ronda = 0;
-    	        				//	bzero(NMEA_data.NMEA_GNRMC,256);
-    	        					len7 = 0;
-    	        					prom_lat = 0;
-    	        					prom_lon = 0;
-    	        					auxi1_echo = 0;
-    	        					auxi2_echo = 0;
-    	        					parar_RD1 = (uint8_t *) 1;
-    	        					//Para detener el envio de datos del GPS se manda lo siguiente
-    	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
-    	        					len = 0;
-    	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
-    	        				//	xEventGroupClearBits(event_group, BEGIN_TASK2);
-    	        				}
+    	        		//La primera vez contara 10 rondas, de resto seran 40
+    	        		if (segunda_vuelta == 0){
+    	        			if (gps_data.ronda == 10 ){
+    	        				segunda_vuelta = 1;
+    	        				//Como ya termine de guardar 10 veces los datos reinicio las variables
+    	        				gps_data.ronda = 0;
+    	        				len7 = 0;
+    	        				prom_lat = 0;
+    	        				prom_lon = 0;
+    	        				auxi1_echo = 0;
+    	        				auxi2_echo = 0;
+    	        				parar_RD1 = (uint8_t *) 1;
+    	        				//Para detener el envio de datos del GPS se manda lo siguiente
+    	        				len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+    	        				len = 0;
+    	        				//Se envia el bit de sincronismo
+    	        				xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     	        			}
+    	        		}
 
-	        				if (gps_data.ronda == 40 ){
-	        					//Como ya termine de guardar 10 veces los datos reinicio las variables globales
-	        					gps_data.ronda = 0;
-	        				//	bzero(NMEA_data.NMEA_GNRMC,256);
-	        					len7 = 0;
-	        					prom_lat = 0;
-	        					prom_lon = 0;
-	        					auxi1_echo = 0;
-	        					auxi2_echo = 0;
-	        					parar_RD1 = (uint8_t *) 1;
-	        					//Para detener el envio de datos del GPS se manda lo siguiente
-	        					len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
-	        					len = 0;
-	        					xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
-	        				//	xEventGroupClearBits(event_group, BEGIN_TASK2);
-	        				}
-
-    	        		    break;
+	        			if (gps_data.ronda == 40 ){
+	        				//Como ya termine de guardar 40 veces los datos reinicio las variables globales
+	        				gps_data.ronda = 0;
+	        				len7 = 0;
+	        				prom_lat = 0;
+	        				prom_lon = 0;
+	        				auxi1_echo = 0;
+	        				auxi2_echo = 0;
+	        				parar_RD1 = (uint8_t *) 1;
+	        				//Para detener el envio de datos del GPS se manda lo siguiente
+	        				len = uart_write_bytes(UART_NUM_2,"AT+GPSRD=0\r\n", 12);
+	        				len = 0;
+	        				//Se envia el bit de sincronismo
+	        				xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
+	        			//	xEventGroupClearBits(event_group, BEGIN_TASK2);
+	        			}
+   	        		    break;
     	        		}
     	        	}
 
-    	        /*	if (parar_RD1 == 1){
-    	        		 ESP_LOGI(TAG1, "4- Para RD es true \r\n");
-    	        		 vTaskDelay( pdMS_TO_TICKS(3000) );
-    	        	}*/
-
     	        	//Espera un segundo que es el tiempo optimo de espera para solicitar los datos
 	        	    vTaskDelay( pdMS_TO_TICKS(1000) );
-    	     		ESP_LOGI(TAG1, " 1+ Espere 1 segundos");
+    	     	//	ESP_LOGI(TAG1, " 1+ Espere 1 segundos");
     	     	}
     	}
 
@@ -917,6 +895,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     		gps_data.ronda_error++;
     		if (gps_data.ronda_error >= 25){
     			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
+    			//Reinicio todas las variables y mando el comando AT para reiniciar el A9G
+    			//Luego doy senal de sincronismo
     			gps_data.ronda_error = 0;
     			gps_data.ronda = 0;
     			gps_data.error_gps = 1;

@@ -103,7 +103,7 @@ typedef struct {
 
 gps_data_t gps_data;
 
-void echo_task(void *P);
+void GNSS_task(void *P);
 
 
 #endif /* MAIN_NMEA_SETTING_H_ */

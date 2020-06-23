@@ -17,12 +17,13 @@ typedef struct {
 	uint8_t vuelta_error;
 	uint8_t error_temp;
 	uint8_t pos_temp;
+	uint8_t primer_ciclo;
 } AM2301_data_t;
 
 
 AM2301_data_t Thum;
 
 
-void TareaDHT(void *P);
+void TareaAM2301(void *P);
 
 #endif

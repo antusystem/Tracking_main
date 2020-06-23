@@ -8,6 +8,12 @@
 #ifndef MAIN_INCLUDE_TRACKING_H_
 #define MAIN_INCLUDE_TRACKING_H_
 
+//Definir los tiempos de espera de comandos AT
+
+//#define PRODUCCION
+#define TESIS
+
+
 typedef enum
 {
 	P_cerrada = 0,
@@ -22,7 +28,6 @@ typedef struct {
     char Longitude_dir[20];/*!< Longitude (degrees) */
     char Humedad[319];
     char Temperatura[319];
-
 } message_data_t;
 
 
@@ -54,6 +59,24 @@ typedef enum
 
 
 //Enum para asignar los tiempos de espera para cada comando AT
+
+#ifdef TESIS
+typedef enum {
+    t_CFUN = 12000,
+    t_CSST = 30000,
+    t_CIICR = 90000,
+    t_CGREG = 5000,
+    t_CMGF = 12000,
+    t_CIFSR = 5000,
+    t_CPAS = 5000,
+    t_CMGS = 30000,
+	t_CIPSTART = 30000,
+	t_CIPSEND = 30000,
+    t_CPOWD = 5000,
+} e_TEspera;
+#endif
+
+#ifdef PRODUCCION
 typedef enum {
     t_CFUN = 12000,
     t_CSST = 30000,
@@ -67,8 +90,7 @@ typedef enum {
 	t_CIPSEND = 647000,
     t_CPOWD = 5000,
 } e_TEspera;
-
-
+#endif
 
 
 #endif /* MAIN_INCLUDE_TRACKING_H_ */

@@ -427,7 +427,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 						//No se toma en cuenta el a;o biciesto
 						if ( GPS_data->day == 1){
 							GPS_data->day = 28;
-							if (GPS_data->year == 24 || GPS_data == 28){
+							if (GPS_data->year == 24 || GPS_data->year == 28){
 								GPS_data->day = 29;
 							}
 							strcpy(GPS_data->mes,"Febrero");
@@ -594,8 +594,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 */
 
 
-  void echo_task(void *arg)
-{
+  void GNSS_task(void *arg){
+
 	//Se inicia la tarea configurando el Uart 2
     uart_config_t uart_config = {
         .baud_rate = 115200,

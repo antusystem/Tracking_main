@@ -29,7 +29,7 @@ extern const int BEGIN_TASK1;
 
 extern const int SYNC_BIT_TASK1;
 
-extern const int SYNC_BIT_TASK2;
+//extern const int SYNC_BIT_TASK2;
 /*
 extern const int BEGIN_TASK2;
 extern const int BEGIN_TASK3;*/
@@ -37,7 +37,7 @@ extern const int BEGIN_TASK3;*/
 //Para los limites de la temperatura
 extern uint8_t limite_a;
 extern uint8_t limite_b;
-extern uint8_t limite_c;
+//extern uint8_t limite_c;
 
 
 const char *nvs_tag = "NVS";
@@ -114,7 +114,7 @@ static esp_err_t leerDHT(gpio_num_t pin,uint8_t *humedad, uint8_t *decimal_hum, 
     return ESP_OK;
 }
 
-void TareaDHT(void *P){
+void TareaAM2301(void *P){
 
 	printf("Entre en TareaDHT \r\n");
 	uint8_t temperatura = 0, decimal_temp = 0, signo_temp = 0;
@@ -123,6 +123,7 @@ void TareaDHT(void *P){
     char auxc1[54] = "", auxc2[54] = "";
     int auxi3 = 0, auxi4 = 0;
     float prom_temp = 0, prom_hum = 0;
+    Thum.primer_ciclo = 1;
 
 
     //Para saber la posicion en que estoy dentro del arreglo de promedios de temp y hum
@@ -246,6 +247,7 @@ void TareaDHT(void *P){
 
         if (sirve == 0 && vuelta_temp >=16){
         	limite_d = 1;
+        	Thum.primer_ciclo = 0;
         	vuelta_temp = 0;
         	xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
         //	xEventGroupSetBits(event_group, BEGIN_TASK2);

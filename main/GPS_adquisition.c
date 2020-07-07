@@ -835,6 +835,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
     	        		ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
     	        		gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
+    	        		ESP_LOGI(TAG1,"float es %.7f", gps_data.latitude_prom);
     	        		ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
     	        		//Envio los datos por cola
     	        		xQueueOverwrite(xQueue_gps,&gps_data);
@@ -893,7 +894,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     		vTaskDelay( pdMS_TO_TICKS(1000) );
     		ESP_LOGI(TAG1, "2+ Espere 1 segundo");
     		gps_data.ronda_error++;
-    		if (gps_data.ronda_error >= 25){
+    		if (gps_data.ronda_error >= 10){
     			//Pongo error_gps en 1 para saber que no se logro la comunicacion con el GPS
     			//Reinicio todas las variables y mando el comando AT para reiniciar el A9G
     			//Luego doy senal de sincronismo

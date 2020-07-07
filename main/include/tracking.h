@@ -69,9 +69,9 @@ typedef enum {
     t_CMGF = 12000,
     t_CIFSR = 5000,
     t_CPAS = 5000,
-    t_CMGS = 30000,
-	t_CIPSTART = 30000,
-	t_CIPSEND = 30000,
+    t_CMGS = 31000,
+	t_CIPSTART = 32000,
+	t_CIPSEND = 33000,
     t_CPOWD = 5000,
 } e_TEspera;
 #endif

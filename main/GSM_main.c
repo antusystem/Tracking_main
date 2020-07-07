@@ -207,10 +207,14 @@ static void  Envio_mensaje(char* mensaje, uint8_t tamano)
     		error++;
     		if (error >= 1){
     			ESP_LOGE(TAG,"21- No se mando el mensaje Error");
+    			jail = 1;
     			break;
     		}
-    	}else if (error >= 2){
-    		jail = 1;
+    	}else {
+    		error++;
+    		if (error >= 2){
+    			jail = 1;
+    		}
     	}
     vTaskDelay(700 / portTICK_PERIOD_MS);
     }

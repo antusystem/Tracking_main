@@ -13,28 +13,44 @@ static const char *TAG2 = "GPS_Parsing";
 
 
 typedef struct {
-    char NMEA_GNGGA[BUF_SIZE];
-    char NMEA_GPGSA[BUF_SIZE];
-    char NMEA_BDGSA[BUF_SIZE];
-    char NMEA_GPGSV1[BUF_SIZE];
-    char NMEA_GPGSV2[BUF_SIZE];
-    char NMEA_GPGSV3[BUF_SIZE];
-    char NMEA_GPGSV4[BUF_SIZE];
-    char NMEA_GPGSV5[BUF_SIZE];
-    char NMEA_GPGSV6[BUF_SIZE];
-    char NMEA_GPGSV7[BUF_SIZE];
-    char NMEA_GPGSV8[BUF_SIZE];
-    char NMEA_GPGSV9[BUF_SIZE];
-    char NMEA_BDGSV[BUF_SIZE];
-    char NMEA_GNRMC[BUF_SIZE];
-    char NMEA_GNVTG[BUF_SIZE];
+    char NMEA_GNGGA[256];
+    char NMEA_GPGSA[256];
+    char NMEA_BDGSA[256];
+    char NMEA_GPGSV1[256];
+    char NMEA_BDGSV[256];
+    char NMEA_GNRMC[256];
+    char NMEA_GNVTG[256];
 } NMEA_data_t;
 
+typedef enum
+{
+	time_utc = 0,	//Valor para indicara el tiempo en UTC
+	Nactive,			//Dice si esta conectado, aunque no siempre funciona bien en el A9G
+	Nlatitude,
+	Nlatitude_dir,
+	Nlongitude,
+	Nlongitude_dir,
+	Nspeed,
+	Ntrack,
+	Ndate,
+} rmc_stages;
+
+typedef enum
+{
+	GNGGA = 0,
+	GPGSA,
+	BDGSA,
+	GPGSV,
+	BDGSV,
+	GNRMC,
+	GNVTG,
+} NMEA_sentences;
+
 typedef struct {
-    float latitude[10];                                                /*!< Latitude (degrees) */
+    float latitude[41];                                                /*!< Latitude (degrees) */
     float latitude_prom;
     char latitude_direct[20];
-    float longitude[10];                                               /*!< Longitude (degrees) */
+    float longitude[41];                                               /*!< Longitude (degrees) */
     float longitude_prom;
     char longitude_direct[20];
     float altitude;                                                /*!< Altitude (meters) */
@@ -55,27 +71,13 @@ typedef struct {
     float speed;                                                   /*!< Ground speed, unit: m/s */
     float cog;                                                     /*!< Course over ground */
     float variation;                                               /*!< Magnetic variation */
+    uint8_t error_gps;
+    uint8_t ronda_error;
+    uint16_t ronda;
+    rmc_stages stage;
 } gps_data_t;
 
-typedef struct {
-    char time_UTC[11];
-    char latitude[10];                                                /*!< Latitude (degrees) */
-    char latitude_deg[318];
-    float latitude_deg_f;
-    char latitude_min[9];
-    float latitude_min_f;
-    char latitude_dir[2];
-    char longitude[10];                                               /*!< Longitude (degrees) */
-    char longitude_deg[318];
-    float longitude_deg_f;
-    char longitude_min[7];
-    float longitude_min_f;
-    char longitude_dir[2];
-    char fix[2]; 													 /*!< Fix status */
-    char sats_in_use[3];   										 /*!< Number of satellites in use */
-    char dop_h[5];                                                   /*!< Horizontal dilution of precision */
-    char altitude[5];                                                /*!< Altitude (meters) */
-} gga_data_t;
+
 
 typedef struct {
     char time_UTC[11];
@@ -97,14 +99,11 @@ typedef struct {
     char date[7];   										 /*!< Number of satellites in use */
 } rmc_data_t;
 
+
+
 gps_data_t gps_data;
 
-void echo_task(void *P);
-
-
-
-
-
+void GNSS_task(void *P);
 
 
 #endif /* MAIN_NMEA_SETTING_H_ */

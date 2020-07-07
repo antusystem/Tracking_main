@@ -2,7 +2,7 @@
  * El main del sistema, se encarga de recibir los datos GPS y de temperatura
  * para luego enviarlos por mensaje de texto y por GPRS a thingspeak
 
-*/
+*///Nerge con master
 #include "dht.h"
 #include <stdio.h>
 #include <string.h>

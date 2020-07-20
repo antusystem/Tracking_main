@@ -20,6 +20,12 @@ typedef enum
 	P_abierta,
 } e_Puerta;
 
+typedef enum
+{
+	Dato_temp = 0,
+	Dato_gps,
+} e_temp_gps;
+
 
 typedef struct {
     char Latitude[319];

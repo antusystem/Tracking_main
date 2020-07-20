@@ -26,6 +26,11 @@
 #define SIM800l_PWR (23)
 #define SIM800l_RST (5)
 
+/* Lenght de mensaje de GPRS */
+
+#define Phone_Number "+584242428865"
+
+
 //Para el gps
 #define BUF_SIZE (1024)
 #include "NMEA_setting.h"
@@ -173,17 +178,21 @@ static void  Envio_mensaje(char* mensaje, uint8_t tamano)
 	//Esta funcion enviara el mensaje que se le pase
 	char aux[BUF_SIZE] = "32!";
 	uint16_t size = 0;
-	uint8_t error = 0, jail = 0;
+	uint8_t error = 0, jail = 0,lenght = 0;
 	const char* finalSMSComand = "\x1A";
 
 	//Se manda el comando AT para comenzar el envio del mensaje
 	ESP_LOGW("Mensaje","Mandare el mensaje");
-	uart_write_bytes(UART_NUM_1,"AT+CMGS=\"+584242428865\"\r\n", 25);
+	bzero(aux,BUF_SIZE);
+	sprintf(aux,"AT+CMGS=\"%s\"\r\n",Phone_Number);
+	lenght = strlen(aux);
+	uart_write_bytes(UART_NUM_1,aux, lenght);
 
 	//Se espera la respuesta y luego se compara a ver si es la esperada
 	//La respuesta es "inmediata" asi que no deberia hacer falta ponerlo en un ciclo
 	Tiempo_Espera(aux, 20,&size,&error, t_CMGS);
     vTaskDelay(300 / portTICK_PERIOD_MS);
+    //Se compara si es la respuesta esperada
 	if(strncmp(aux,"\r\n>",3) == 0){
 		uart_write_bytes(UART_NUM_1,mensaje,tamano);
 		uart_write_bytes(UART_NUM_1,(const char*)finalSMSComand, 2);
@@ -949,7 +958,6 @@ static void  Envio_GPRS_Lat(gps_data_t* gps_data3){
 	}
 }
 
-
 static void  Envio_GPRS_Lon(gps_data_t* gps_data3){
 	//Esta funcion envia los datos a thingspeak
 
@@ -1240,6 +1248,154 @@ static void  Envio_GPRS_Puerta(){
 	}
 }
 
+
+static void  Envio_GPRS(){
+	//Esta funcion envia los datos a thingspeak
+
+	char message[318] = "Welcome to ESP32!";
+	char aux[BUF_SIZE] = "";
+	uint16_t size = 0, a = 0, lengh = 0;
+	uint8_t error = 0;
+	e_ATCOM3 ATCOM3 = 0;
+
+	while (a == 0){
+	switch (ATCOM3){
+    case CIPSTART:
+    	//Para inciar la comunicacion con thingspeak
+    	ESP_LOGW(TAG, "CIPSTART 1\r\n");
+    	uart_write_bytes(UART_NUM_1,"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n", 43);
+    	Tiempo_Espera(aux, ATCOM3+40,&size,&error,t_CIPSTART);
+    	if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+    		strncmp(aux,"\r\nALREADY CONNECTED",7) == 0 ||
+    		strncmp(aux,"\r\nOK",4) == 0){
+            ATCOM3++;
+            ESP_LOGW(TAG,"Aumentando ATCOM");
+            error = 0;
+        }else if(strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- PUERTA Dio Error");
+            error++;
+            if (error >= 3){
+            	ATCOM3 = CPOWD3;
+            }
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART- PUERTA PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        } else if (error >= 1){
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+	break;
+    case CIPSTART2:
+    	//Para esperar el connect ok
+    	ESP_LOGW(TAG, "Connect ok \r\n");
+        Tiempo_Espera(aux, ATCOM3+40,&size,&error,t_CIPSTART);
+        if(strncmp(aux,"\r\nCONNECT OK",12) == 0 ||
+        	strncmp(aux,"\r\nALREADY CONNECTED",7) == 0){
+        	ATCOM3++;
+        	ESP_LOGW(TAG,"Aumentando ATCOM");
+        	error = 0;
+        	vTaskDelay(2000 / portTICK_PERIOD_MS);
+        }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- PUERTA Dio Error");
+        	error++;
+        	if (error >= 3){
+        		ATCOM3 = CPOWD3;
+        	}
+        } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+        	ESP_LOGE(TAG,"CIPSTART2- PUERTA PDP DEACT");
+        	error++;
+        	pdp_deact = 1;
+        	ATCOM3 = CPOWD3;
+        } else if (error >= 1){
+        	ATCOM3 = CPOWD3;
+        }
+        bzero(aux, BUF_SIZE);
+        size = 0;
+        break;
+        case CIPSEND:
+        	//Para mandar datos a thingspeak
+            ESP_LOGW(TAG, "CIPSEND\r\n");
+            uart_write_bytes(UART_NUM_1,"AT+CIPSEND=75\r\n", 15);
+            Tiempo_Espera(aux,40,&size,&error,t_CIPSEND);
+            vTaskDelay(300 / portTICK_PERIOD_MS);
+            if(strncmp(aux,"\r\n>",3) == 0){
+            	//para la latitud y longitud con lenght de 75
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=VYU3746VFOJQ2POH&field5=100\r\n");
+            	lengh = strlen(message);
+
+            	uart_write_bytes(UART_NUM_1,message,lengh);
+                ESP_LOGW(TAG,"Longitud enviada");
+                error = 0;
+                ATCOM3++;
+        	}else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+        		ESP_LOGE(TAG,"CIPSEND- LON Dio Error");
+        		error++;
+        		if (error >= 3){
+        			ATCOM3 = CPOWD3;
+        		}
+        	} else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+            	ESP_LOGE(TAG,"CIPSEND- LON PDP DEACT");
+            	error++;
+            	pdp_deact = 1;
+            	ATCOM3 = CPOWD3;
+            } else if (error >= 1){
+            	ATCOM3 = CPOWD3;
+            }
+        	bzero(aux, BUF_SIZE);
+        	size = 0;
+        	break;
+        	case CIPSEND2:
+        		//Para eseprar la respuesta
+        	    ESP_LOGW(TAG, "CIPSEND2\r\n");
+        	    Tiempo_Espera(aux, 42,&size,&error,t_CIPSEND);
+        	    if(strncmp(aux,"\r\nCLOSED",8) == 0){
+        	        ESP_LOGW(TAG,"Socket cerrado");
+        	        a = 1;
+                }else if(strncmp(aux,"\r\nCMS ERROR:",12) == 0 || strncmp(aux,"\r\nERROR",7) == 0){
+                    ESP_LOGE(TAG,"CIPSEND2- LON Dio error");
+                    error++;
+                    if (error >= 3){
+                    	ATCOM3 = CPOWD3;
+                    }
+                } else if(strncmp(aux,"\r\n+PDP: DEACT",7) == 0){
+                	ESP_LOGE(TAG,"CIPSEND2- LON PDP DEACT");
+                	error++;
+                	pdp_deact = 1;
+                	ATCOM3 = CPOWD3;
+                } else if (error >= 1){
+                	ATCOM3 = CPOWD3;
+                }
+                bzero(aux, BUF_SIZE);
+                size = 0;
+            break;
+        	case CPOWD3:
+        		//Para apagar el sim800l
+               ESP_LOGW(TAG, "Apagar \r\n");
+               uart_write_bytes(UART_NUM_1,"AT+CPOWD=1\r\n", 12);
+               Tiempo_Espera(aux, ATCOM3+30,&size,&error,t_CPOWD);
+               if(strncmp(aux,"\r\nNORMAL POWER DOWN",19) == 0){
+            	   ESP_LOGW(TAG,"Se apago el modulo SIM800L");
+            	   error = 0;
+            	   a = 1;
+               } else {
+            	   ESP_LOGE(TAG,"CPOWD3- Dio Error");
+            	   error++;
+            	   if (error >= 3){
+            		   error = 0;
+            		   a = 1;
+            	   }
+               }
+               bzero(aux, BUF_SIZE);
+               size = 0;
+        	break;
+	}
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+}
+
 static void  Enviar_GPRS(gps_data_t* gps_data2, AM2301_data_t* Thum2 ){
 
 	// Esta funcion envia los datos correspondientes por GPRS a thingspeak
@@ -1340,19 +1496,21 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
 {
 	//Esta funcion se encarga de enviar el mensaje de texto adecuado
 	char message[318] = "Welcome to ESP32!";
-
+	uint8_t lenght = 0;
 
     if (Thum2->error_temp == 0){
     		if (Thum2->primer_ciclo == 0){
     			switch(limite_b){
     			case 0:
     				sprintf(message,"La humedad es: %.1f %% y la temperatura es: %.1f C",Thum2->Prom_hum[Thum2->pos_temp-1],Thum2->Prom_temp[Thum2->pos_temp-1]);
-    				Envio_mensaje(message,48);
+    				lenght = strlen(message);
+    				Envio_mensaje(message,lenght);
     				ESP_LOGI(TAG, "Send send message [%s] ok", message);
     			break;
     			case 1:
     				sprintf(message,"La temperatura se salio de los limites. La humedad es: %.1f  %% y la temperatura es: %.1f C",Thum2->Prom_hum[Thum2->pos_temp-1],Thum2->Prom_temp[Thum2->pos_temp-1]);
-    				Envio_mensaje(message,89);
+    				lenght = strlen(message);
+    				Envio_mensaje(message,lenght);
     				ESP_LOGI(TAG, "Send send message [%s] ok", message);
     				if (limite_a == 0){
     					limite_b = 0;
@@ -1361,13 +1519,15 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
     			}
     		} else {
    				sprintf(message,"No se ha terminado el primer ciclo de la medicion de temperatura.");
-    			Envio_mensaje(message,65);
+   				lenght = strlen(message);
+   				Envio_mensaje(message,lenght);
     			ESP_LOGI(TAG, "Send send message [%s] ok", message);
     		}
     } else {
     	Thum.error_temp = 0;
     	sprintf(message,"No se logro medir la temepratura. Revisar las conexiones.");
-    	Envio_mensaje(message,57);
+    	lenght = strlen(message);
+    	Envio_mensaje(message,lenght);
     	ESP_LOGI(TAG, "Send send message [%s] ok", message);
     }
 
@@ -1381,22 +1541,26 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
         	if (gps_data2->year == 20){
 			    sprintf(message,"La latitud es: %.6f %s y la longitud es: %.6f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
-			    Envio_mensaje(message,91);
+			    lenght = strlen(message);
+			    Envio_mensaje(message,lenght);
 			    ESP_LOGI(TAG, "Send send message [%s] ok", message);
 			    bzero(message,318);
         		sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2->day,gps_data2->mes,gps_data2->year,gps_data2->hour,gps_data2->minute,gps_data2->second);
-        		Envio_mensaje(message,112);
+        		lenght = strlen(message);
+        		Envio_mensaje(message,lenght);
         		ESP_LOGI(TAG, "Send send message [%s] ok", message);
         	} else{
 
         		 sprintf(message,"No se logro conectar a la red GPS.");
-        		 Envio_mensaje(message,34);
+        		 lenght = strlen(message);
+        		 Envio_mensaje(message,lenght);
         		 ESP_LOGI(TAG, "Send send message [%s] ok", message);
         	}
         } else{
   			gps_data.error_gps = 0;
     		sprintf(message,"No se logro conectar con el modulo GPS.");
-    		Envio_mensaje(message,39);
+    		lenght = strlen(message);
+    		Envio_mensaje(message,lenght);
     		ESP_LOGI(TAG, "Send send message [%s] ok", message);
         }
     break;
@@ -1407,19 +1571,22 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
     		if (gps_data2->year == 20){
 
     			sprintf(message,"La puerta fue abierta. La latitud es: %.6f %s y la longitud es: %.6f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
-    			Envio_mensaje(message,91);
+    			lenght = strlen(message);
+    			Envio_mensaje(message,lenght);
     			ESP_LOGI(TAG, "Send send message [%s] ok", message);
     			if (puerta_a == 0){
     				puerta_d = 1;
     			}
     			 bzero(message,318);
     	         sprintf(message,"Las medidas se realizaron el %d de %s de 20%d a las %d horas con %d minutos y %d segundos",gps_data2->day,gps_data2->mes,gps_data2->year,gps_data2->hour,gps_data2->minute,gps_data2->second);
-    	         Envio_mensaje(message,112);
+    	         lenght = strlen(message);
+    	         Envio_mensaje(message,lenght);
     	         ESP_LOGI(TAG, "Send send message [%s] ok", message);
     	    } else{
 
     	    	 sprintf(message,"La puerta se abrio, pero no se logro conectar a la red GPS.");
-    	    	 Envio_mensaje(message,59);
+    	    	 lenght = strlen(message);
+    	    	 Envio_mensaje(message,lenght);
     	    	 ESP_LOGI(TAG, "Send send message [%s] ok", message);
     			if (puerta_a == 0){
     				puerta_d = 1;
@@ -1428,6 +1595,7 @@ static void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2)
     	} else{
 			gps_data.error_gps = 0;
 			sprintf(message,"La puerta se abrio, pero no se logro conectar con el modulo GPS.");
+			lenght = strlen(message);
 			Envio_mensaje(message,64);
 			ESP_LOGI(TAG, "Send send message [%s] ok", message);
 			if (puerta_a == 0){

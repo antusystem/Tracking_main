@@ -9,6 +9,8 @@
 #define MAIN_NMEA_SETTING_H_
 #include "esp_log.h"
 
+/*No se usa generalmente porque esta comentado en la funcion RMC_parsing,
+ * no lo borro porque puede ser necesario para debug*/
 static const char *TAG2 = "GPS_Parsing";
 
 
@@ -22,8 +24,7 @@ typedef struct {
     char NMEA_GNVTG[256];
 } NMEA_data_t;
 
-typedef enum
-{
+typedef enum{
 	time_utc = 0,	//Valor para indicara el tiempo en UTC
 	Nactive,			//Dice si esta conectado, aunque no siempre funciona bien en el A9G
 	Nlatitude,
@@ -35,8 +36,7 @@ typedef enum
 	Ndate,
 } rmc_stages;
 
-typedef enum
-{
+typedef enum{
 	GNGGA = 0,
 	GPGSA,
 	BDGSA,
@@ -56,14 +56,14 @@ typedef struct {
     float altitude;                                                /*!< Altitude (meters) */
     char estado[2];
     uint8_t fix;                                                 /*!< Fix status */
-    uint8_t sats_in_use;                                           /*!< Number of satellites in use */
-    int hour;      /*!< Hour */
-    uint8_t minute;    /*!< Minute */
-    uint8_t second;    /*!< Second */
-    uint8_t day;   /*!< Day (start from 1) */
-    uint8_t month; /*!< Month (start from 1) */
+    uint8_t sats_in_use;
+    int hour;
+    uint8_t minute;
+    uint8_t second;
+    uint8_t day;
+    uint8_t month;
     char mes[20];
-    uint16_t year; /*!< Year (start from 2000) */
+    uint16_t year;
     float dop_h;                                                   /*!< Horizontal dilution of precision */
     float dop_p;                                                   /*!< Position dilution of precision  */
     float dop_v;                                                   /*!< Vertical dilution of precision  */
@@ -99,11 +99,16 @@ typedef struct {
     char date[7];   										 /*!< Number of satellites in use */
 } rmc_data_t;
 
-
-
 gps_data_t gps_data;
 
+/* Tareas Asociadas*/
 void GNSS_task(void *P);
+
+/*Funciones Asociadas*/
+void Guardar_dolar(char* auxc2_echo, uint16_t* posicion_echo);
+NMEA_data_t Dividir_oraciones(NMEA_data_t NMEA_data, char* buf, uint16_t* posicion_echo);
+gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data);
+gps_data_t GPS_parsing(char* data, gps_data_t GPS_data);
 
 
 #endif /* MAIN_NMEA_SETTING_H_ */

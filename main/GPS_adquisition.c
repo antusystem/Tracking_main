@@ -10,29 +10,14 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-
-
-//Defino el tamano del buffer de recepcion de datos GPS
-//Con el modulo A9G los buses llegan por segundo y tienden a ser un string
-//de aproximadament 282 caracteres
-#define BUF_SIZE (1024)
-
+#include "tracking.h"
 #include "NMEA_setting.h"
 
 NMEA_data_t NMEA_data;
 
 //Se definen auxiliares
 uint8_t auxi1_echo = 0, auxi2_echo = 0;
-
-//char auxc1_echo[] = "AT\r\n\r\nOK\r\n";
-//El siguiente auxiliar se usa para tener otra variable con los datos que llegan al buffer de recepcion
 char auxc2_echo[BUF_SIZE] = "";
-//char auxc3_echo[] = "AT+GPS=1\r\nOK\r\n";
-//char auxc4_echo[] = "AT+GPSRD=1\r\nOK\r\n";
-//Los siguientes dos char se ponen ya que no queria agarrarlo la parte donde se usa
-//a pesar de usar comillas simples
-//char auxc5_echo[1] = "$";
-//char auxc7_echo[1] = "B";
 
 //Variables globales para calcular promedios en varias funciones
 float prom_lon = 0;
@@ -42,31 +27,20 @@ float prom_lat = 0;
 uint8_t primera_vuelta = 0;
 uint8_t segunda_vuelta = 0;
 
-//Definir los pines del uart
-#define ECHO_TEST_TXD  (GPIO_NUM_18)
-#define ECHO_TEST_RXD  (GPIO_NUM_0)
-#define ECHO_TEST_RTS  (UART_PIN_NO_CHANGE)
-#define ECHO_TEST_CTS  (UART_PIN_NO_CHANGE)
+//Para la longitud del bus de llegada del uart
 int len = 0;
 
 //Para usar gestion de eventos
 extern EventGroupHandle_t event_group;
-
 extern const int BEGIN_TASK2;
-
 extern const int SYNC_BIT_TASK2;
 
-
 //Para la cola
-
 extern QueueHandle_t xQueue_gps;
 
-static const char *TAG1 = "uart_echo_example";
+static const char *TAG1 = "GPS_adquisition";
 
-
-
-static void  Guardar_dolar(char* auxc2_echo, uint16_t* posicion_echo)
-{
+void  Guardar_dolar(char* auxc2_echo, uint16_t* posicion_echo){
 	// Esta funcion prende el modulo sim800 y le da un tiempo para que se conecte a la radiobase
 	int i2 = 0;
 	//En este for escanea el buffer por la posicion de $
@@ -80,8 +54,7 @@ static void  Guardar_dolar(char* auxc2_echo, uint16_t* posicion_echo)
 	}
 }
 
-static NMEA_data_t  Dividir_oraciones(NMEA_data_t NMEA_data, char* buf, uint16_t* posicion_echo)
-{
+NMEA_data_t  Dividir_oraciones(NMEA_data_t NMEA_data, char* buf, uint16_t* posicion_echo){
 		// Empezare a guardar en el struct escaladamente segun la posicion de $
 		// Se guardara cada oracion por separado
 		int i3 = 0;
@@ -89,21 +62,25 @@ static NMEA_data_t  Dividir_oraciones(NMEA_data_t NMEA_data, char* buf, uint16_t
 			NMEA_data.NMEA_GNGGA[i3]= buf[i];
 		    i3++;
 		}
+
 		i3 = 0;
 		for (int i = posicion_echo[1] + 1; i < (posicion_echo[2]-1); i++){
 			NMEA_data.NMEA_GPGSA[i3]= buf[i];
 		    i3++;
 		}
+
 		i3 = 0;
 		for (int i = posicion_echo[2] + 1; i < (posicion_echo[3]-1); i++){
 		    NMEA_data.NMEA_BDGSA[i3]= buf[i];
 		    i3++;
 		}
+
 		i3 = 0;
 		for (int i = posicion_echo[3] + 1; i < (posicion_echo[4]-1); i++){
 		    NMEA_data.NMEA_GPGSV1[i3]= buf[i];
 		    i3++;
 		}
+
 		//Cuando se conecte a los satelites mandara de 3 a 12 oraciones GPGSV, por lo que
 		// se guarda la primera y se espera los siguientes datos, comprobando que comience por B
 		// la siguiente oracion y no por G
@@ -131,17 +108,13 @@ static NMEA_data_t  Dividir_oraciones(NMEA_data_t NMEA_data, char* buf, uint16_t
 		return (NMEA_data);
 }
 
+gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
-
-static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
-
-	//Esta funcion ordena los datos de RMC
-	// Con la variable ronda (que se aumenta cada vez que llega algo al buffer) se lleva el control
-	// de la posicion que se guardara en el arreglo de latitud y longitud. Al llegar a 10 debe parar
-	// de enviar datos
+	/*Esta funcion ordena los datos de RMC, con la variable ronda (que se aumenta cada vez que
+	 *  llega algo al buffer) se lleva el control de la posicion que se guardara en el arreglo
+	 *   de latitud y longitud. Al llegar a 10 debe parar de enviar datos*/
 	rmc_data_t rmc_data;
 	uint16_t flags2[11] = {0};
-//	int l1 = 0;
 	//Se agrega la hora en la zona horaria
 	int zona_horaria = - 4;
 	char hora[3] = "";
@@ -156,9 +129,7 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	GPS_data->ronda++;
 	GPS_data->stage = 0;
 
-
-
-//Guardar la posicion de las comas en flags2
+	//Guardar la posicion de las comas en flags2
 	for(int k1 = 0; k1 < 11; k1++){
 		char* pos = strstr(GNRMC_data,coma);
 		flags2[k1] = pos - GNRMC_data;
@@ -170,11 +141,9 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		GPS_data->stage = k1;
 		switch (GPS_data->stage){
 		case time_utc:
-
 			strncpy(rmc_data.time_UTC,GNRMC_data+(flags2[k1]+1),flags2[k1+1]-flags2[k1]-1);
 			rmc_data.time_UTC[10] = 0x00;
 	//		ESP_LOGI(TAG2,"El tiempo UTC es: %s\r\n",rmc_data.time_UTC);
-
 			// Dividir los datos en arrelgos separados
 			strncpy(&hora[0],&rmc_data.time_UTC[0],2);
 			hora[2] = 0x00;
@@ -186,13 +155,13 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 			ESP_LOGI(TAG2,"El min es: %s\r\n",min);
 			ESP_LOGI(TAG2,"El seg es: %s\r\n",seg);*/
 
-			//Guardar los datos en GPS_data
-			//A la hora se le suma la zona horaria porque la que da el GPS es UTC
-			//En el caso de Venezuela es sola -4 h, si afectara los minutos se debe acomodarlo
+			/*Guardar los datos en GPS_data, a la hora se le suma la zona horaria porque la que
+			 * da el GPS es UTC, en el caso de Venezuela es sola -4 h, si afectara los minutos
+			 *  se debe acomodarlo*/
+
 			GPS_data->hour = atoi(hora) + zona_horaria;
 			GPS_data->minute = atoi(min);
 			GPS_data->second = atoi(seg);
-
 			switch (GPS_data->hour){
 			case -4:
 				GPS_data->hour = 20;
@@ -210,70 +179,49 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		/*	ESP_LOGI(TAG2,"El hora es: %d\r\n",GPS_data->hour);
 			ESP_LOGI(TAG2,"El min es: %d\r\n",GPS_data->minute);
 			ESP_LOGI(TAG2,"El seg es: %d\r\n",GPS_data->second);*/
-
-
-		break;
+			break;
 		case Nactive:
-		//	l1 = 0;
 			strncpy(rmc_data.active,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.active[1] = 0x00;
 		//	ESP_LOGI(TAG2,"El estado es: %s\r\n",rmc_data.active);
 			strcpy(GPS_data->estado,rmc_data.active);
 		//	ESP_LOGI(TAG2,"El estado es: %s\r\n",GPS_data->estado);
-
-		break;
+			break;
 		case Nlatitude:
-	//		l1 = 0;
 			strncpy(rmc_data.latitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
-	//		l1 = strlen(rmc_data.latitude);
 			rmc_data.latitude[9] = 0x00;
 	//		ESP_LOGI(TAG2,"La latitud en grados y minutos es: %s\r\n",rmc_data.latitude);
-
 			//Pasar a un string los minutos
 			strncpy(rmc_data.latitude_min,&rmc_data.latitude[2],7);
-	//		l1 = strlen(rmc_data.latitude_min);
 			rmc_data.latitude_min[7] = 0x00;
 	//		ESP_LOGI(TAG2,"La latitud en minutos es: %s\r\n",rmc_data.latitude_min);
-
 			//Pasar los minutos a float
 			rmc_data.latitude_min_f = atof(rmc_data.latitude_min);
 	//		ESP_LOGI(TAG2,"La latitud en minutosf es: %f\r\n",rmc_data.latitude_min_f);
-
 			//Pasar a un string los degres
 			strncpy(rmc_data.latitude_deg,rmc_data.latitude,2);
-	//		l1 = strlen(rmc_data.latitude_deg);
 			rmc_data.latitude_deg[2] = 0x00;
 	//		ESP_LOGI(TAG2,"La latitud en degres es: %s\r\n",rmc_data.latitude_deg);
-
 			//Pasar los degres a float
 			rmc_data.latitude_deg_f = atof(rmc_data.latitude_deg);
 	//		ESP_LOGI(TAG2,"La latitud en degf es: %f\r\n",rmc_data.latitude_deg_f);
-
-			//Obtener la longitud en deg y guardolo en GPSdata
-	//		float lon1 = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
-
 			GPS_data->latitude[GPS_data->ronda] = (float)rmc_data.latitude_deg_f + (float)(rmc_data.latitude_min_f/60);
 	//		ESP_LOGI(TAG2,"La latitud en DEG es: %f\r\n",GPS_data->latitude[GPS_data->ronda]);
-
 			prom_lat +=  GPS_data->latitude[GPS_data->ronda];
 			GPS_data->latitude_prom = GPS_data->latitude[GPS_data->ronda];
-
-	//		ESP_LOGI(TAG2,"El pre -prom lat en DEG es: %f\r\n",prom_lat);
-
 	//		GPS_data->latitude_prom = prom_lat/10;
 	//		ESP_LOGI(TAG2,"El promedio de la latitude en DEG es: %f\r\n",GPS_data->latitude_prom);
 		break;
 		case Nlatitude_dir:
 			strncpy(rmc_data.latitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.latitude_dir[2] = 0x00;
-
 			if(rmc_data.latitude_dir[0] == 'N'){
 				sprintf(GPS_data->latitude_direct,"Norte");
 			}else{
 				sprintf(GPS_data->latitude_direct,"Sur");
 			}
 		//	ESP_LOGI(TAG2,"La direccion de la latitud es: %s\r\n",GPS_data->latitude_direct);
-		break;
+			break;
 		case Nlongitude:
 //			l1 = 0;
 			strncpy(rmc_data.longitude,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
@@ -310,22 +258,18 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 	//		GPS_data->longitude_prom = prom_lon/10;
 	//		ESP_LOGI(TAG2,"El promedio de la longitud en DEG es: %f\r\n",GPS_data->longitude_prom);
 			GPS_data->longitude_prom = GPS_data->longitude[GPS_data->ronda];
-
-
 		break;
 		case Nlongitude_dir:
-
 			strncpy(rmc_data.longitude_dir,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.longitude[1] = 0x00;
 	//		ESP_LOGI(TAG2,"La longitud-dir es: %s\r\n",rmc_data.latitude_dir);
-
 			if(rmc_data.longitude_dir[0] == 'E'){
 				sprintf(GPS_data->longitude_direct,"Este");
 			}else{
 				sprintf(GPS_data->longitude_direct,"Oeste");
 			}
 	//		ESP_LOGI(TAG2,"La direccion de la longitud es: %s\r\n",GPS_data->longitude_direct);
-		break;
+			break;
 		case Nspeed:
 			strncpy(rmc_data.speed,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.speed[5] = 0x00;
@@ -333,14 +277,11 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 
 			GPS_data->speed = atof(rmc_data.speed);
 		//	ESP_LOGI(TAG2,"La velocidad es: %f\r\n",GPS_data->speed);
-
-		break;
+			break;
 		case Ntrack:
-
 			strncpy(rmc_data.track,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.track[4] = 0x00;
 		//	ESP_LOGI(TAG2,"El track es: %s\r\n",rmc_data.track);
-
 			//No agrego track porque no hace falta todavia
 	//		GPS_data->track = atof(rmc_data.speed);
 	//		ESP_LOGI(TAG2,"La velocidad es: %s\r\n",GPS_data->track);
@@ -348,183 +289,175 @@ static gps_data_t RMC_parsing(char* GNRMC_data, gps_data_t *GPS_data){
 		case Ndate:	//		l1 = 0;
 			strncpy(rmc_data.date,&GNRMC_data[flags2[k1]+1],flags2[k1+1]-flags2[k1]-1);
 			rmc_data.date[6] = 0x00;
-	//		ESP_LOGI(TAG2,"La fecha es: %s\r\n",rmc_data.date);
-
+			// ESP_LOGI(TAG2,"La fecha es: %s\r\n",rmc_data.date);
 			// Dividir los datos en arrelgos separados
-				strncpy(&dia[0],&rmc_data.date[0],2);
-				dia[2] = 0x00;
-				strncpy(&mes[0],&rmc_data.date[2],2);
-				mes[2] = 0x00;
-				strncpy(&ano[0],&rmc_data.date[4],2);
-				ano[2] = 0x00;
-		/*		ESP_LOGI(TAG2,"El hora es: %s\r\n",hora);
-				ESP_LOGI(TAG2,"El min es: %s\r\n",min);
-				ESP_LOGI(TAG2,"El seg es: %s\r\n",seg);*/
-
-				//Guardar los datos en GPS_data
-				GPS_data->day = atoi(dia);
-				GPS_data->month = atoi(mes);
-				GPS_data->year = atoi(ano);
-
+			strncpy(&dia[0],&rmc_data.date[0],2);
+			dia[2] = 0x00;
+			strncpy(&mes[0],&rmc_data.date[2],2);
+			mes[2] = 0x00;
+			strncpy(&ano[0],&rmc_data.date[4],2);
+			ano[2] = 0x00;
+		/*	ESP_LOGI(TAG2,"El hora es: %s\r\n",hora);
+			ESP_LOGI(TAG2,"El min es: %s\r\n",min);
+			ESP_LOGI(TAG2,"El seg es: %s\r\n",seg);*/
+			//Guardar los datos en GPS_data
+			GPS_data->day = atoi(dia);
+			GPS_data->month = atoi(mes);
+			GPS_data->year = atoi(ano);
+			switch (GPS_data->month){
+			case 1:
+				strcpy(GPS_data->mes,"Enero");
+				break;
+			case 2:
+				strcpy(GPS_data->mes,"Febrero");
+				break;
+			case 3:
+				strcpy(GPS_data->mes,"Marzo");
+				break;
+			case 4:
+				strcpy(GPS_data->mes,"Abril");
+				break;
+			case 5:
+				strcpy(GPS_data->mes,"Mayo");
+				break;
+			case 6:
+				strcpy(GPS_data->mes,"Junio");
+				break;
+			case 7:
+				strcpy(GPS_data->mes,"Julio");
+				break;
+			case 8:
+				strcpy(GPS_data->mes,"Agosto");
+				break;
+			case 9:
+				strcpy(GPS_data->mes,"Septimbre");
+				break;
+			case 10:
+				strcpy(GPS_data->mes,"Octubre");
+				break;
+			case 11:
+				strcpy(GPS_data->mes,"Noviembre");
+				break;
+			case 12:
+				strcpy(GPS_data->mes,"Diciembre");
+				break;
+			}
+			if (GPS_data->hour == 20 || GPS_data->hour == 21 || GPS_data->hour == 22 || GPS_data->hour == 23){
 				switch (GPS_data->month){
 				case 1:
-					strcpy(GPS_data->mes,"Enero");
-				break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Diciembre");
+					} else {
+					GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 2:
-					strcpy(GPS_data->mes,"Febrero");
-				break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Enero");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 3:
-					strcpy(GPS_data->mes,"Marzo");
-				break;
+				//No se toma en cuenta el a;o biciesto
+					if ( GPS_data->day == 1){
+						GPS_data->day = 28;
+						if (GPS_data->year == 24 || GPS_data->year == 28){
+							GPS_data->day = 29;
+						}
+						strcpy(GPS_data->mes,"Febrero");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 4:
-					strcpy(GPS_data->mes,"Abril");
-				break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Marzo");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 5:
-					strcpy(GPS_data->mes,"Mayo");
-				break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 30;
+						strcpy(GPS_data->mes,"Abril");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 6:
-					strcpy(GPS_data->mes,"Junio");
-				break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Mayo");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 7:
-					strcpy(GPS_data->mes,"Julio");
-				break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 30;
+						strcpy(GPS_data->mes,"Junio");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				case 8:
-					strcpy(GPS_data->mes,"Agosto");
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Julio");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
 				break;
 				case 9:
-					strcpy(GPS_data->mes,"Septimbre");
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Agosto");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
 				break;
 				case 10:
-					strcpy(GPS_data->mes,"Octubre");
-				break;
-				case 11:
-					strcpy(GPS_data->mes,"Noviembre");
-				break;
-				case 12:
-					strcpy(GPS_data->mes,"Diciembre");
-				break;
-				}
-
-				if (GPS_data->hour == 20 || GPS_data->hour == 21 || GPS_data->hour == 22 || GPS_data->hour == 23){
-					switch (GPS_data->month){
-					case 1:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Diciembre");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 2:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Enero");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 3:
-						//No se toma en cuenta el a;o biciesto
-						if ( GPS_data->day == 1){
-							GPS_data->day = 28;
-							if (GPS_data->year == 24 || GPS_data->year == 28){
-								GPS_data->day = 29;
-							}
-							strcpy(GPS_data->mes,"Febrero");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 4:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Marzo");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 5:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 30;
-							strcpy(GPS_data->mes,"Abril");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 6:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Mayo");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 7:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 30;
-							strcpy(GPS_data->mes,"Junio");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 8:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Julio");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 9:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Agosto");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 10:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 30;
-							strcpy(GPS_data->mes,"Septiembre");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 11:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 31;
-							strcpy(GPS_data->mes,"Octubre");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
-					case 12:
-						if ( GPS_data->day == 1){
-							GPS_data->day = 30;
-							strcpy(GPS_data->mes,"Noviembre");
-						} else {
-							GPS_data->day = GPS_data->day -1;
-						}
-					break;
+					if ( GPS_data->day == 1){
+						GPS_data->day = 30;
+						strcpy(GPS_data->mes,"Septiembre");
+					} else {
+						GPS_data->day = GPS_data->day -1;
 					}
+					break;
+				case 11:
+					if ( GPS_data->day == 1){
+						GPS_data->day = 31;
+						strcpy(GPS_data->mes,"Octubre");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
+				case 12:
+					if ( GPS_data->day == 1){
+						GPS_data->day = 30;
+						strcpy(GPS_data->mes,"Noviembre");
+					} else {
+						GPS_data->day = GPS_data->day -1;
+					}
+					break;
 				}
+			}
 			//	ESP_LOGI(TAG2,"La fecha es %d-%d-%d \r\n",GPS_data->day,GPS_data->month,GPS_data->year);
 			//	ESP_LOGI(TAG2,"La fecha es %d de %s del 20%d \r\n",GPS_data->day,GPS_data->mes,GPS_data->year);
-		break;
+			break;
 		}
 	}
 	return *GPS_data;
 }
 
-
-static gps_data_t  GPS_parsing(char* data, gps_data_t GPS_data)
-{
+gps_data_t GPS_parsing(char* data, gps_data_t GPS_data){
 
 	//Esta funcion identificara que tipo datos (dentro de los soportados) es la oracion y lo organizara
-
 	char RMC[3] = "RMC";
-
 	if (data[2] == RMC[0] && data[3] == RMC[1] && data[4] == RMC[2]){
 	//	ESP_LOGI(TAG2,"Empezara a parsear RMC");
 		GPS_data  = RMC_parsing(data, &GPS_data);
@@ -593,31 +526,7 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 }
 */
 
-
-  void GNSS_task(void *arg){
-
-	//Se inicia la tarea configurando el Uart 2
-    uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-    };
-
-    //El uart 0 ahora se configura en el main junto al uart 1
-/*    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_0, &uart_config);
-    uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, ECHO_TEST_RTS, ECHO_TEST_CTS);
-*/
-
- //   ESP_LOGI(TAG1, "Empezar a configurar Uart 2");
-
-    uart_param_config(UART_NUM_2, &uart_config);
-    uart_set_pin(UART_NUM_2, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS);
-    uart_driver_install(UART_NUM_2, BUF_SIZE * 2, 0, 0, NULL, 0); //BOGUS
-//  ESP_LOGI(TAG1, "Uart 2 Iniciado");
+void GNSS_task(void *arg){
 
     //Se declara la variable que copiara lo que llegue al buffer
     uint8_t tx_buf[BUF_SIZE];
@@ -643,7 +552,6 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     gps_data.ronda = 0;
     gps_data.stage = 0;
 
-
     while (1) {
 
     	xEventGroupWaitBits(event_group,BEGIN_TASK2,pdFALSE,true,portMAX_DELAY);
@@ -666,40 +574,40 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	// Empezara escaladamente a mandar lo comandos AT necesarios en cada vuelta
 
     	if (parar_RD1 == 0){
-    	switch (auxi1_echo){
-    	case 0:
-    		//En la primera vuelta manda AT para ver si la comunicacion ya se puede establecer
-	        len3 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
-	        ESP_LOGI(TAG1, "envio: AT\r\n");
-	    break;
-    	case 1:
-    		//En la segunda vuelta activa el GPS
-    		if (segunda_vuelta == 0){
-        		len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
-        		ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
-    		} else {
+    		switch (auxi1_echo){
+    		case 0:
+    			//En la primera vuelta manda AT para ver si la comunicacion ya se puede establecer
+    			len3 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
+    			ESP_LOGI(TAG1, "envio: AT\r\n");
+    			break;
+    		case 1:
+    			//En la segunda vuelta activa el GPS
+    			if (segunda_vuelta == 0){
+    				len5 = uart_write_bytes(UART_NUM_2,"AT+GPS=1\r\n",10);
+    				ESP_LOGI(TAG1, "envio: AT+GPS=1\r\n");
+    			} else {
     			//Si ya no es la primera vuelta entonces hago esto para que entre en el siguiente if
     			len5 = uart_write_bytes(UART_NUM_2,"AT\r\n", 4);
-    		}
-    	break;
-    	case 2:
-    		//En la tercera vuelta solicita los datos del GPS
-    		if (auxi2_echo == 0){
-    			len7 = uart_write_bytes(UART_NUM_2,"AT+GPSRD=1\r\n", 12);
-    			ESP_LOGI(TAG1, "envio: AT+GPSRD=1\r\n");
-    		} else {
+    			}
+    			break;
+    		case 2:
+    			//En la tercera vuelta solicita los datos del GPS
+    			if (auxi2_echo == 0){
+    				len7 = uart_write_bytes(UART_NUM_2,"AT+GPSRD=1\r\n", 12);
+    				ESP_LOGI(TAG1, "envio: AT+GPSRD=1\r\n");
+    			} else {
     			//Si ya no es la primera vuelta entonces hago esto para que entre en el siguiente if
     			len7 = 2;
+    			}
+    			break;
     		}
-		break;
-    	}
     	}
 
     	//Cuando se envia algo len se vuelve la longitud de lo que se envio
     	//si no se envio nada, entonces no estrara en esta parte. Ademas,
     	// len7 no se reinicia para que luego de pedir los datos GPS siempre entre
     	if ((len3 > 0) || (len5 > 0) || (len7 > 0) ) {
-    //	if (len3 + len5 + len7 > 0) {
+    //	if ((len3 + len5 + len7) > 0) {
 
     	  //Lee el uart
     	//	ESP_LOGI(TAG1, "Voy a leer el uart");
@@ -708,10 +616,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
     	  //Se comprueba si llego algo al uart y se publica que llego
     	    if(len>0){
-
     	     	// Borrar lo que tenia antes auxc2
     	     	bzero(auxc2_echo,BUF_SIZE);
-
     	     //Se copia lo que llego al buffer, las primeras 2 veces no hace falta que
     	     //tenga una dimension tan grande el auxiliar
     	     	if (auxi1_echo < 2){
@@ -719,13 +625,8 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
     	     	} else {
     	     		memcpy(auxc2_echo,tx_buf,BUF_SIZE);
     	     	}
-
-
     	     	//Empezara a ver escaladamente como comprueba ATOK, ATGPS y "ATGPSRD"
-
-
     	        if (parar_RD1 == 0){
-
     	        	switch (auxi1_echo){
     	        	case 0:
     	        		//En el caso 0 verifica si respondio AT OK
@@ -821,7 +722,6 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
     	        		// Empezare a guardar en el struct escaladamente segun la posicion de $
     	        		// Se guardara cada oracion por separado
-
     	        		NMEA_data = Dividir_oraciones(NMEA_data,auxc2_echo,&posicion_echo);
 
     	        		/*	ESP_LOGI(TAG1,"GPGSA es: %s\r\n",NMEA_data.NMEA_GPGSA);
@@ -832,7 +732,6 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
 
 
     	        		//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
-
     	        		ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
     	        		gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
     	        		ESP_LOGI(TAG1,"float es %.7f", gps_data.latitude_prom);
@@ -882,7 +781,6 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
    	        		    break;
     	        		}
     	        	}
-
     	        	//Espera un segundo que es el tiempo optimo de espera para solicitar los datos
 	        	    vTaskDelay( pdMS_TO_TICKS(1000) );
     	     	//	ESP_LOGI(TAG1, " 1+ Espere 1 segundos");
@@ -916,7 +814,6 @@ static NMEA_data_t  NMEA_separator(NMEA_data_t datos_ordenados, char* datos_NMEA
         		len = 0;
     			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
     		}
-
     	}
     }
 }

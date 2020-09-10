@@ -1,8 +1,12 @@
-# PPP over Serial (PPPoS) client example
+# Tracking_main 
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
 
 ## Overview
+
+
+An application that integrates the ESP32, the SIM800L, the temperature-humidity sensor AM2301, and the dev board A9G. This code use the ESP32 has the main microcontroler of the group, and it is in charge of asking the temperature to the sensor and process it, giving the AT Commands to the A9G to start the GPS and to start the to deliver the data, and also to give turn on the SIM800L and then give it the AT Commands for it to forward the data acquired from the GPS and the sensor to a mobile cellphone (by 2G) and to thingspeak (by GPRS with through HTTP GET).
+
+The AT Commands have their parsing. The GPS raw data is also parse before sending it.
 
 A general PPP application consists of two parts: PPP server which is provided by cellular modem module and PPP client which is provided by ESP32 in this example.
 Standard operating systems like Windows and Unix integrate a full PPP stack and provide a way to setup PPP connection at the same time. But how can we get access to Internet by PPP protocol in a resource constrained system? Fortunately, the PPP protocol has already been implemented in lwIP, but it doesn't supply a common way to setup a PPP connection.
@@ -13,6 +17,11 @@ When PPP connection has been established, the IP packet flow from application si
 
 ### Hardware Required
 
+For this it was used the TTGO T-Call SIM800L that includes an ESP32 and a SIM800L in the same dev board, the temperature-humidity sensor AM2301, and the dev board A9G from Ai Thinker that has GPS and GPRS (though the GPRS was not used with the A9G).
+
+Remember that SIM800L only suports 2G and GPRS and it might not work in some countries
+
+
 To run this example, you need an ESP32 dev board (e.g. ESP32-WROVER Kit) or ESP32 core board (e.g. ESP32-DevKitC).
 For test purpose, you also need a cellular modem module. Here we take the [SIM800L](http://www.simcom.com/product/showproduct.php?lang=en&id=277) and [BG96](https://www.quectel.com/product/bg96.htm) as an example.
 You can also try other modules as long as they embedded PPP protocol.
@@ -21,14 +30,32 @@ You can also try other modules as long as they embedded PPP protocol.
 
 #### Pin Assignment
 
-**Note:** The following pin assignments are used by default which can be changed in menuconfig.
+SIM800l_PWR_KEY: SIM800l Power Key pin
+SIM800l_PWR: SIM800L Power pin
+SIM800l_RST: SIM800L Reset pin
 
-| ESP32  | Cellular Modem |
-| ------ | -------------- |
-| GPIO25 | RX             |
-| GPIO26 | TX             |
-| GND    | GND            |
-| 5V     | VCC            |
+|       ESP32     |     SIM800L    |
+| ------ -------- | -------------- |
+|      GPIO27     |       TX       |
+|      GPIO26     |       RX       |
+|      GPIO04     | SIM800l_PWR_KEY|
+|      GPIO23     |   SIM800l_PWR  |
+|      GPIO05     |   SIM800l_RST  |
+
+|       ESP32     |      AM2301    |
+| --------------- | -------------- |
+|      GPIO19     |    Data line   |
+|       3,3 V     |       VCC      |
+|        GND      |       GND      |
+
+|       ESP32     |       A9G      |
+| --------------- | -------------- |
+|      GPIO18     |       TX       |
+|      GPIO00     |       RX       |
+|        GND      |       GND      |
+
+
+
 
 ### Configure the project
 

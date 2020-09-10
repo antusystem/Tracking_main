@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := pppos_client
+PROJECT_NAME := Tracking_main
 
 include $(IDF_PATH)/make/project.mk
 

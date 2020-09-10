@@ -14,9 +14,9 @@ The AT Commands have their parsing. The GPS raw data is also parse before sendin
 * Download the latest realase with `git clone https://github.com/antusystem/Tracking_main.git`
 * Go to the folder cd ../Tracking_main
 * Build the menuconfig to make the respective changes to your computer
-* Once it is added as a project, in its propierties check C/C++ Build > Environment check the IDF_PATH if it is correct
-* Compile clean
-* Compile make all
+* If you are using Eclipse, once it is added as a project, in its propierties check C/C++ Build > Environment check the IDF_PATH if it is correct
+* Compile `make clean`
+* Compile `make all`
 
 It should not indicate any error following this steps. Continue reading to learn the location of the GPIO that connect the hardware.
 
@@ -72,9 +72,9 @@ Check de IDFPATH in the configurations of the proyect
 
 ## Log
 
-Last compile: September 10th, 2020.
-Last test: July 15, 2020
-Last compile espidf version: v4.3-dev-472-gcf056a7d0
+* Last compile: September 10th, 2020.
+* Last test: July 15, 2020
+* Last compile espidf version: v4.3-dev-472-gcf056a7d0
 
 ## License
 MIT License

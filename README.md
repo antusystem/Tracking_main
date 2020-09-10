@@ -9,7 +9,16 @@ An application that integrates the ESP32, the SIM800L, the temperature-humidity 
 The AT Commands have their parsing. The GPS raw data is also parse before sending it
 
 
-## How to use example
+## Installation
+
+* Download the latest realase with `git clone https://github.com/antusystem/Tracking_main.git`
+* Go to the folder cd ../Tracking_main
+* Build the menuconfig to make the respective changes to your computer
+* Once it is added as a project, in its propierties check C/C++ Build > Environment check the IDF_PATH if it is correct
+* Compile clean
+* Compile make all
+
+It should not indicate any error following this steps. Continue reading to learn the location of the GPIO that connect the hardware.
 
 ### Hardware Required
 
@@ -24,10 +33,10 @@ SIM800l_PWR: SIM800L Power pin
 SIM800l_RST: SIM800L Reset pin
 
 |       ESP32     |     SIM800L    |
-| ------ -------- | -------------- |
+| --------------- | -------------- |
 |      GPIO27     |       TX       |
 |      GPIO26     |       RX       |
-|      GPIO04     | SIM800l_PWR_KEY|
+|      GPIO04     |SIM800l_PWR_KEY |
 |      GPIO23     |   SIM800l_PWR  |
 |      GPIO05     |   SIM800l_RST  |
 
@@ -57,12 +66,6 @@ To configure the pins you have to change them manually in:
 - For the API key of thingspeak go to GSM.c in the define API_KEY
 
 
-## Example Output
-
-The example will get module and operator's information after start up, and then go into PPP mode to start mqtt client operations. This example will also send a short message to someone's phone if you have enabled this feature in menuconfig.
-
-```
-
 ## Troubleshooting
 
 Check de IDFPATH in the configurations of the proyect
@@ -72,3 +75,14 @@ Check de IDFPATH in the configurations of the proyect
 Last compile: September 10th, 2020.
 Last test: July 15, 2020
 Last compile espidf version: v4.3-dev-472-gcf056a7d0
+
+## License
+MIT License
+
+Copyright (c) [2020] [Alejandro Antunes]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

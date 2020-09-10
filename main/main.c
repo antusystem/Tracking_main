@@ -1,7 +1,12 @@
-/*main
- * El main del sistema, se encarga de declarar variables, configurar el uart, crear las tareas
- * y verificar el estado de la puerta.
+/*Tracking_main
+ * Author: Alejandro Antunes
+ * e-mail: aleantunes95@gmail.com
+ * Date: 09-10-2020
+ * MIT License
+ * As it is described in the readme file
+ *
 */
+
 #include <AM2301.h>
 #include <stdio.h>
 #include <string.h>

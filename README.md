@@ -1,131 +1,88 @@
-# PPP over Serial (PPPoS) client example
+# Tracking_main 
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
 
 ## Overview
 
-A general PPP application consists of two parts: PPP server which is provided by cellular modem module and PPP client which is provided by ESP32 in this example.
-Standard operating systems like Windows and Unix integrate a full PPP stack and provide a way to setup PPP connection at the same time. But how can we get access to Internet by PPP protocol in a resource constrained system? Fortunately, the PPP protocol has already been implemented in lwIP, but it doesn't supply a common way to setup a PPP connection.
-This example introduces a library focusing on sending and parsing AT commands, and also provides useful functions to set up PPP connection.
-When PPP connection has been established, the IP packet flow from application side will be transmitted to Internet by cellular module. This example shows how to act as a MQTT client after the PPPoS channel created by using [ESP-MQTT](https://docs.espressif.com/projects/esp-idf/en/latest/api-reference/protocols/mqtt.html) APIs.
 
-## How to use example
+An application that integrates the ESP32, the SIM800L, the temperature-humidity sensor AM2301, and the dev board A9G. This code use the ESP32 has the main microcontroler of the group, and it is in charge of asking the temperature to the sensor and process it, giving the AT Commands to the A9G to start the GPS and to start the to deliver the data, and also to give turn on the SIM800L and then give it the AT Commands for it to forward the data acquired from the GPS and the sensor to a mobile cellphone (by 2G) and to thingspeak (by GPRS with through HTTP GET). It also check the state a pin connected to the door sending information if it is open at anytime.
+
+The AT Commands have their parsing. The GPS raw data is also parse before sending it
+
+
+## Installation
+
+* Download the latest realase with `git clone https://github.com/antusystem/Tracking_main.git`
+* Go to the folder cd ../Tracking_main
+* Build the menuconfig to make the respective changes to your computer
+* Once it is added as a project, in its propierties check C/C++ Build > Environment check the IDF_PATH if it is correct
+* Compile clean
+* Compile make all
+
+It should not indicate any error following this steps. Continue reading to learn the location of the GPIO that connect the hardware.
 
 ### Hardware Required
 
-To run this example, you need an ESP32 dev board (e.g. ESP32-WROVER Kit) or ESP32 core board (e.g. ESP32-DevKitC).
-For test purpose, you also need a cellular modem module. Here we take the [SIM800L](http://www.simcom.com/product/showproduct.php?lang=en&id=277) and [BG96](https://www.quectel.com/product/bg96.htm) as an example.
-You can also try other modules as long as they embedded PPP protocol.
+For this it was used the TTGO T-Call SIM800L that includes an ESP32 and a SIM800L in the same dev board, the temperature-humidity sensor AM2301, and the dev board A9G from Ai Thinker that has GPS and GPRS (though the GPRS was not used with the A9G).
 
-**Note:** Since SIM800L only support **2G** which will **not** work in some countries. And also keep in mind that in some other countries it will stop working soon (many remaining 2G networks will be switched off in the next 2-3 years). So you should **check with your local providers for further details** if you try this example with any 2G modules.
+Remember that **SIM800L only suports 2G and GPRS and it might not work in some countries.**
 
 #### Pin Assignment
 
-**Note:** The following pin assignments are used by default which can be changed in menuconfig.
+SIM800l_PWR_KEY: SIM800l Power Key pin
+SIM800l_PWR: SIM800L Power pin
+SIM800l_RST: SIM800L Reset pin
 
-| ESP32  | Cellular Modem |
-| ------ | -------------- |
-| GPIO25 | RX             |
-| GPIO26 | TX             |
-| GND    | GND            |
-| 5V     | VCC            |
+|       ESP32     |     SIM800L    |
+| --------------- | -------------- |
+|      GPIO27     |       TX       |
+|      GPIO26     |       RX       |
+|      GPIO04     |SIM800l_PWR_KEY |
+|      GPIO23     |   SIM800l_PWR  |
+|      GPIO05     |   SIM800l_RST  |
+
+|       ESP32     |      AM2301    |
+| --------------- | -------------- |
+|      GPIO19     |    Data line   |
+|       3,3 V     |       VCC      |
+|        GND      |       GND      |
+
+|       ESP32     |       A9G      |
+| --------------- | -------------- |
+|      GPIO18     |       TX       |
+|      GPIO00     |       RX       |
+|        GND      |       GND      |
+
+
 
 ### Configure the project
 
-Open the project configuration menu (`idf.py menuconfig`). Then go into `Example Configuration` menu.
+To configure the pins you have to change them manually in:
 
-- Choose the modem module in `Choose supported modem device(DCE)` option, currently we only support BG96 and SIM800L.
-- Set the access point name in `Set Access Point Name(APN)` option, which should depend on the operator of your SIM card.
-- Set the username and password for PPP authentication in `Set username for authentication` and `Set password for authentication` options.
-- Select `Send MSG before power off` if you want to send a short message in the end of this example, and also you need to set the phone number correctly in `Peer Phone Number(with area code)` option.
-- In `UART Configuration` menu, you need to set the GPIO numbers of UART and task specific parameters such as stack size, priority.
+- For the SIM800L communication go to uart.c
+- For the SIM800L power up go to GSM.c
+- For the A9G communication go to uart.c
+- For the AM2301 data line pin go to AM2301.h
+- For the phone number that will recieve the message go to GSM.c in the define Phone_Number
+- For the API key of thingspeak go to GSM.c in the define API_KEY
 
-**Note:** During PPP setup, we should specify the way of authentication negotiation. By default it's configured to `PAP`. You can change to others (e.g. `CHAP`) in `Component config-->LWIP-->Enable PPP support` menu.
-
-### Build and Flash
-
-Run `idf.py -p PORT flash monitor` to build and flash the project..
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
-
-## Example Output
-
-The example will get module and operator's information after start up, and then go into PPP mode to start mqtt client operations. This example will also send a short message to someone's phone if you have enabled this feature in menuconfig.
-
-### BG96 Output
-
-```bash
-I (1276) pppos_example: Module: BG96
-I (1276) pppos_example: Operator: "CHINA MOBILE CMCC"
-I (1276) pppos_example: IMEI: 866425030121349
-I (1276) pppos_example: IMSI: 460007454185220
-I (1476) pppos_example: rssi: 27, ber: 99
-I (1676) pppos_example: Battery voltage: 3908 mV
-I (1876) pppos_example: Modem PPP Started
-I (2656) pppos_example: Modem Connect to PPP Server
-I (2656) pppos_example: ~~~~~~~~~~~~~~
-I (2656) pppos_example: IP          : 10.65.71.127
-I (2656) pppos_example: Netmask     : 255.255.255.255
-I (2666) pppos_example: Gateway     : 10.64.64.64
-I (2666) pppos_example: Name Server1: 211.136.112.50
-I (2676) pppos_example: Name Server2: 211.136.150.66
-I (2676) pppos_example: ~~~~~~~~~~~~~~
-I (2686) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (2696) pppos_example: MQTT other event id: 7
-I (3426) MQTT_CLIENT: Sending MQTT CONNECT message, type: 1, id: 0000
-I (3856) pppos_example: MQTT_EVENT_CONNECTED
-I (3856) pppos_example: sent subscribe successful, msg_id=20132
-I (4226) pppos_example: MQTT_EVENT_SUBSCRIBED, msg_id=20132
-I (4226) pppos_example: sent publish successful, msg_id=0
-I (4646) pppos_example: MQTT_EVENT_DATA
-TOPIC=/topic/esp-pppos
-DATA=esp32-pppos
-I (4696) pppos_example: Modem PPP Stopped
-I (9466) pppos_example: Send send message [Welcome to ESP32!] ok
-I (9666) pppos_example: Power down
-```
-
-### SIM800L Output
-```bash
-I (1276) pppos_example: Module: SIMCOM_SIM800L
-I (1276) pppos_example: Operator: "CHINA MOBILE"
-I (1276) pppos_example: IMEI: 865992039850864
-I (1276) pppos_example: IMSI: 460007454185220
-I (1476) pppos_example: rssi: 25, ber: 0
-I (1676) pppos_example: Battery voltage: 4674 mV
-I (1876) pppos_example: Modem PPP Started
-I (2806) pppos_example: Modem Connect to PPP Server
-I (2806) pppos_example: ~~~~~~~~~~~~~~
-I (2806) pppos_example: IP          : 10.188.173.2
-I (2806) pppos_example: Netmask     : 255.255.255.255
-I (2816) pppos_example: Gateway     : 192.168.254.254
-I (2816) pppos_example: Name Server1: 211.136.112.50
-I (2826) pppos_example: Name Server2: 211.136.150.66
-I (2826) pppos_example: ~~~~~~~~~~~~~~
-I (2836) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (2846) pppos_example: MQTT other event id: 7
-I (8156) MQTT_CLIENT: Sending MQTT CONNECT message, type: 1, id: 0000
-I (8826) pppos_example: MQTT_EVENT_CONNECTED
-I (8826) pppos_example: sent subscribe successful, msg_id=26237
-I (9526) pppos_example: MQTT_EVENT_SUBSCRIBED, msg_id=26237
-I (9526) pppos_example: sent publish successful, msg_id=0
-I (10326) pppos_example: MQTT_EVENT_DATA
-TOPIC=/topic/esp-pppos
-DATA=esp32-pppos
-I (10376) pppos_example: Modem PPP Stopped
-I (14526) pppos_example: Send send message [Welcome to ESP32!] ok
-I (15076) pppos_example: Power down
-```
 
 ## Troubleshooting
-1. Why sending AT commands always failed and this example just keeping rebooting? e.g.
 
-```bash
-E (626) sim800: sim800_sync(293): send command failed
-E (626) sim800: sim800_init(628): sync failed
-```
-   * Make sure your modem module is in command mode stably before you run this example.
+Check de IDFPATH in the configurations of the proyect
 
-(For any technical queries, please open an [issue](https://github.com/espressif/esp-idf/issues) on GitHub. We will get back to you as soon as possible.)
+## Log
+
+Last compile: September 10th, 2020.
+Last test: July 15, 2020
+Last compile espidf version: v4.3-dev-472-gcf056a7d0
+
+## License
+MIT License
+
+Copyright (c) [2020] [Alejandro Antunes]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

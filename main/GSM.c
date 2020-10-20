@@ -517,7 +517,7 @@ void  Envio_GPRS(uint8_t gps_temp, uint8_t campo,float dato){
             if (gps_temp == Dato_temp){
             	sprintf(message,"GET https://api.thingspeak.com/update?api_key=%s&field%d=%.1f\r\n",API_KEY,campo,dato);
             } else if ( gps_temp == Dato_gps){
-            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=%s&field%d=%.6f\r\n",API_KEY,campo,dato);
+            	sprintf(message,"GET https://api.thingspeak.com/update?api_key=%s&field%d=%.8f\r\n",API_KEY,campo,dato);
             } else if (gps_temp == Dato_puerta) {
             	sprintf(message,"GET https://api.thingspeak.com/update?api_key=%s&field%d=%d\r\n",API_KEY,campo,(int) dato);
             }
@@ -753,7 +753,7 @@ void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2){
         if (gps_data2->error_gps == 0){
         	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
         	if (gps_data2->year == 20){
-			    sprintf(message,"La latitud es: %.6f %s y la longitud es: %.6f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
+			    sprintf(message,"La latitud es: %.8f %s y la longitud es: %.8f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
 			    lenght = strlen(message);
 			    Envio_mensaje(message,lenght);
 			    ESP_LOGI(TAG, "Send send message [%s] ok", message);
@@ -783,7 +783,7 @@ void  Enviar_Mensaje(gps_data_t* gps_data2, AM2301_data_t* Thum2){
     	//Verifico si se conecto a la red GPS viendo si devolvio que es el a;o 2020
     		if (gps_data2->year == 20){
 
-    			sprintf(message,"La puerta fue abierta. La latitud es: %.6f %s y la longitud es: %.6f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
+    			sprintf(message,"La puerta fue abierta. La latitud es: %.8f %s y la longitud es: %.8f %s",gps_data2->latitude_prom,gps_data2->latitude_direct,gps_data2->longitude_prom,gps_data2->longitude_direct);
     			lenght = strlen(message);
     			Envio_mensaje(message,lenght);
     			ESP_LOGI(TAG, "Send send message [%s] ok", message);

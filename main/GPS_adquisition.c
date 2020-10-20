@@ -732,9 +732,9 @@ void GNSS_task(void *arg){
 
 
     	        		//Una vez separadas las oraciones, de mandan a ordenar con la siguiente funcion
-    	        		ESP_LOGI(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
+    	        		ESP_LOGW(TAG1,"GNRMC es: %s\r\n",NMEA_data.NMEA_GNRMC);
     	        		gps_data = GPS_parsing(NMEA_data.NMEA_GNRMC, gps_data);
-    	        		ESP_LOGI(TAG1,"float es %.7f", gps_data.latitude_prom);
+    	        	//	ESP_LOGI(TAG1,"float es %.7f", gps_data.latitude_prom);
     	        		ESP_LOGI(TAG1,"ronda es %d", gps_data.ronda);
     	        		//Envio los datos por cola
     	        		xQueueOverwrite(xQueue_gps,&gps_data);

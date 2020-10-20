@@ -175,7 +175,7 @@ void TareaAM2301(void *P){
     		sprintf(Thum.Datos_Sensor,"%s",datos_sensor);
     		Thum.Humedad3[j1] = (float) auxi3/10;
     		Thum.Temperatura3[j1] = (float) auxi4/10;
-    		ESP_LOGI("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", Thum.Humedad3[j1],Thum.Temperatura3[j1]);
+    		ESP_LOGW("Sensor_AM2301","La Humedad es: %.1f %% \r\n La temperatura es: %.1f C \r\n", Thum.Humedad3[j1],Thum.Temperatura3[j1]);
     		sirve = 0;
     		Thum.vuelta_error = 0;
     		vuelta_temp++;

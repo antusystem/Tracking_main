@@ -72,7 +72,7 @@ typedef enum{
 typedef enum {
     t_CFUN = 12000,
     t_CSST = 30000,
-    t_CIICR = 90000,
+    t_CIICR = 35000,
     t_CGREG = 5000,
     t_CMGF = 12000,
     t_CIFSR = 5000,

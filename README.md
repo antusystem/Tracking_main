@@ -49,7 +49,7 @@ SIM800l_RST: SIM800L Reset pin
 |       ESP32     |       A9G      |
 | --------------- | -------------- |
 |      GPIO18     |       TX       |
-|      GPIO00     |       RX       |
+|      GPIO15     |       RX       |
 |        GND      |       GND      |
 
 

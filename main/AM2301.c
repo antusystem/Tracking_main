@@ -56,7 +56,7 @@ esp_err_t CapturarDatos(gpio_num_t pin, uint8_t datos[numDHT_bytes]){
     gpio_set_level(pin, 0);
     ets_delay_us(1000);
     gpio_set_level(pin, 1);
-    // Se espera hasta 220us por un flanco de bajada desde el DHT
+    // Se espera hasta 220us por un flanco de bajada desde el AM2301
     if(TiempoDeEspera(pin, 220, 0, NULL)!=ESP_OK)return ESP_ERR_TIMEOUT;
     // Se espera hasta 90us por un flanco de subida
     if(TiempoDeEspera(pin, 90, 1, NULL)!=ESP_OK)return ESP_ERR_TIMEOUT;

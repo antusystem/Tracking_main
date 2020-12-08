@@ -71,7 +71,7 @@ e_Puerta puerta_b = 0;
 
 void app_main(void){
 	//Esta parte inicial es para verificar las veces que se reinicia el esp32
-	int a = 0;
+	/*int a = 0;
 	esp_err_t err = nvs_flash_init();
 	    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
 	        // NVS partition was truncated and needs to be erased
@@ -124,9 +124,9 @@ void app_main(void){
 
 	        // Close
 	        nvs_close(my_handle);
-	    }
+	    }*/
 	//Quitar el comentario de abajo cuando se borre la parte donde se guarda en la memoria flash
-	//nvs_flash_init();
+	nvs_flash_init();
 	Configurar_UARTs();
 
 	/* Colas para las tareas de echo entre uart 0 y  uart 1*/
@@ -189,7 +189,7 @@ void app_main(void){
 			xEventGroupSetBits(event_group, SYNC_BIT_TASK1);
 			xEventGroupSetBits(event_group, SYNC_BIT_TASK2);
 		}
-		printf("Restart counter = %d\n", a);
+	//	printf("Restart counter = %d\n", a);
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 }

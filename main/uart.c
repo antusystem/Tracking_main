@@ -28,7 +28,7 @@
 
 /*Definir los pines del uart conectado al modulo GPS */
 #define GPS_TXD  (GPIO_NUM_18)
-#define GPS_RXD  (GPIO_NUM_0)
+#define GPS_RXD  (GPIO_NUM_15)
 #define GPS_RTS  (UART_PIN_NO_CHANGE)
 #define GPS_CTS  (UART_PIN_NO_CHANGE)
 

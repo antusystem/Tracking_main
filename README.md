@@ -72,8 +72,8 @@ Check de IDFPATH in the configurations of the proyect
 
 ## Log
 
-* Last compile: September 10th, 2020.
-* Last test: July 15, 2020
+* Last compile: September 08th, 2020.
+* Last test: October 31, 2020
 * Last compile espidf version: v4.3-dev-472-gcf056a7d0
 
 ## License

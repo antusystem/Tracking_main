@@ -151,6 +151,11 @@ void app_main(void){
 	gpio_pad_select_gpio(GPIO_NUM_14);
 	gpio_set_direction(GPIO_NUM_14, GPIO_MODE_INPUT);
 
+	//Configurar el led para saber si prendio el ESP32 (tarjeta TTGO Tcall SIM800L)
+	gpio_pad_select_gpio(GPIO_NUM_13);
+	gpio_set_direction(GPIO_NUM_13, GPIO_MODE_OUTPUT);
+	gpio_set_level(GPIO_NUM_13, 1);
+
 	/*Crear el grupo de eventos y las colas para sensor de temperatura,gps y gsm*/
 	event_group = xEventGroupCreate();
 	xQueue_temp = xQueueCreate(1, sizeof(AM2301_data_t));

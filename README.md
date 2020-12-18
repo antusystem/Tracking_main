@@ -6,7 +6,7 @@
 
 An application that integrates the ESP32, the SIM800L, the temperature-humidity sensor AM2301, and the dev board A9G. This code use the ESP32 has the main microcontroler of the group, and it is in charge of asking the temperature to the sensor and process it, giving the AT Commands to the A9G to start the GPS and to start the to deliver the data, and also to give turn on the SIM800L and then give it the AT Commands for it to forward the data acquired from the GPS and the sensor to a mobile cellphone (by 2G) and to thingspeak (by GPRS with through HTTP GET). It also check the state a pin connected to the door sending information if it is open at anytime.
 
-The AT Commands have their parsing. The GPS raw data is also parse before sending it
+The AT Commands have their parsing. The GPS raw data is also parse before sending it.
 
 
 ## Installation
@@ -52,7 +52,7 @@ SIM800l_RST: SIM800L Reset pin
 |      GPIO15     |       RX       |
 |        GND      |       GND      |
 
-
+**Note:** GPIO18 of the ESP32 must be connected to the reception from the A9G because it was configured as TX. The same way happens to GPIO 15, it is configured has recepction so it has to be connected to the transmission of the A9G. In the SIM800L happens the same, but the pins are connected directly in the board.
 
 ### Configure the project
 
@@ -72,7 +72,7 @@ Check de IDFPATH in the configurations of the proyect
 
 ## Log
 
-* Last compile: September 08th, 2020.
+* Last compile: December 18th, 2020.
 * Last test: October 31, 2020
 * Last compile espidf version: v4.3-dev-472-gcf056a7d0
 
